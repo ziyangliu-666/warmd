@@ -1,7 +1,7 @@
 name: ci
 on: [push, pull_request]
 jobs:
-  build:   # compile everything against the CUDA toolkit stubs (no GPU needed)
+  build:
     runs-on: ubuntu-22.04
     container: nvidia/cuda:12.4.1-devel-ubuntu22.04
     steps:
@@ -9,8 +9,9 @@ jobs:
       - run: apt-get update && apt-get install -y --no-install-recommends make gcc python3
       - run: make build/warmd build/lib/libcuda.so.1 build/demo LDFLAGS_EXTRA="-L/usr/local/cuda/lib64/stubs"
       - run: python3 -m py_compile python/warmd/*.py tests/*.py tests/bench/*.py
-  gpu:     # full suite on a self-hosted GPU runner (driver must be a validated branch, see compatibility.md)
-    if: github.event_name == 'push'
+  gpu:
+    # needs a self-hosted runner labelled "gpu"; enable by setting the repository variable GPU_RUNNER=true
+    if: github.event_name == 'push' && vars.GPU_RUNNER == 'true'
     runs-on: [self-hosted, gpu]
     steps:
       - uses: actions/checkout@v4
