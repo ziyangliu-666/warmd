@@ -1,0 +1,15 @@
+# /etc/warmd/gpu0.conf - every command-line option, without the leading "--"
+socket = /run/warmd/gpu0.sock
+gpu = 0
+sessions = 64            # concurrent client processes (each maps one region: rpc-mb + ring-mb + 4 KiB)
+rpc-mb = 8
+ring-mb = 8
+standbys = 1             # warm standby workers (each holds a CUDA context, ~400-900 MB of GPU memory)
+threads = 4              # dispatch threads in the active worker
+quota-mb = 0             # device memory limit per session (0 = none)
+session-wait-ms = 30000  # queue clients when all sessions are busy
+# allow-uid = 1000       # repeatable; default: the daemon's uid and root
+# allow-all = true
+socket-mode = 0666
+metrics-port = 9400      # Prometheus text on 127.0.0.1:9400/metrics (0 = off)
+log-level = 2

@@ -1,0 +1,8 @@
+{"bench":"init","impl":"native","ms":162.21}
+{"bench":"stream_sync_roundtrip","impl":"native","n":5000,"p50_us":0.2,"p99_us":0.3,"min_us":0.2}
+{"bench":"launch_sync","impl":"native","n":5000,"p50_us":9.0,"p99_us":15.1,"min_us":8.1}
+{"bench":"launch_throughput","impl":"native","launches_per_s":363391}
+{"bench":"init","impl":"warmd","ms":1.91}
+{"bench":"stream_sync_roundtrip","impl":"warmd","n":5000,"p50_us":13.5,"p99_us":33.2,"min_us":2.2}
+{"bench":"launch_sync","impl":"warmd","n":5000,"p50_us":30.4,"p99_us":49.9,"min_us":15.2}
+{"bench":"launch_throughput","impl":"warmd","launches_per_s":63892}

@@ -1,0 +1,8 @@
+warmd
+Copyright 2026 the warmd authors
+
+This product includes software derived from ZLUDA (https://github.com/vosen/ZLUDA),
+licensed under the MIT License or the Apache License 2.0:
+  - the layout of the hidden CUDA driver export tables (shim/dark.c)
+  - the integrity-check hash algorithm and mixing table (shim/dark.c)
+Copyright (c) ZLUDA contributors.

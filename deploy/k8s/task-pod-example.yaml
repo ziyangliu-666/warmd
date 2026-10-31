@@ -1,0 +1,19 @@
+# A short-task pod that uses the node's warmd. It needs no GPU resource and no NVIDIA runtime.
+apiVersion: v1
+kind: Pod
+metadata: {name: short-task}
+spec:
+  restartPolicy: Never
+  containers:
+    - name: task
+      image: pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime
+      command: ["python", "-c", "import torch; print((torch.randn(256,256,device='cuda')@torch.randn(256,256,device='cuda')).sum().item())"]
+      env:
+        - {name: WARMD_SOCKET, value: /run/warmd/gpu0.sock}
+        - {name: LD_LIBRARY_PATH, value: /opt/warmd/lib}
+      volumeMounts:
+        - {name: run, mountPath: /run/warmd}
+        - {name: lib, mountPath: /opt/warmd/lib, readOnly: true}
+  volumes:
+    - {name: run, hostPath: {path: /run/warmd}}
+    - {name: lib, hostPath: {path: /usr/local/lib/warmd}}

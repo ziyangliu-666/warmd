@@ -1,0 +1,18 @@
+# One instance per GPU:  systemctl enable --now warmd@0
+[Unit]
+Description=warmd resident CUDA host for GPU %i
+After=nvidia-persistenced.service
+Wants=nvidia-persistenced.service
+
+[Service]
+ExecStart=/usr/local/bin/warmd --config /etc/warmd/gpu%i.conf
+Restart=always
+RestartSec=1
+RuntimeDirectory=warmd
+RuntimeDirectoryMode=0755
+# the supervisor re-execs itself for CUDA workers; workers need the GPU device nodes
+LimitMEMLOCK=infinity
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target

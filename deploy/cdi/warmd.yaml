@@ -1,0 +1,17 @@
+# CDI spec: request "warmd.dev/gpu=0" to give a container the warmd client setup for GPU 0.
+# Install to /etc/cdi/warmd.yaml. The container gets the socket and the shim, not the GPU itself.
+cdiVersion: "0.6.0"
+kind: warmd.dev/gpu
+devices:
+  - name: "0"
+    containerEdits:
+      env:
+        - WARMD_SOCKET=/run/warmd/gpu0.sock
+        - LD_LIBRARY_PATH=/opt/warmd/lib
+      mounts:
+        - hostPath: /run/warmd
+          containerPath: /run/warmd
+          options: ["rbind", "rw"]
+        - hostPath: /usr/local/lib/warmd
+          containerPath: /opt/warmd/lib
+          options: ["rbind", "ro"]

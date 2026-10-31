@@ -1,0 +1,14 @@
+{"label": "native", "mode": "exec", "n": 8, "conc": 1, "wall_s": 15.06, "tasks_per_s": 0.53, "p50_ms": 1891.4, "p99_ms": 1917.9, "wrong": 0, "fork_ms": null, "task_ms_p50": null}
+{"label": "native", "mode": "exec", "n": 24, "conc": 8, "wall_s": 10.36, "tasks_per_s": 2.32, "p50_ms": 3467.2, "p99_ms": 3542.3, "wrong": 0, "fork_ms": null, "task_ms_p50": null}
+{"label": "warmd", "mode": "exec", "n": 8, "conc": 1, "wall_s": 12.56, "tasks_per_s": 0.64, "p50_ms": 1561.5, "p99_ms": 1700.0, "wrong": 0, "fork_ms": null, "task_ms_p50": null}
+{"label": "warmd", "mode": "exec", "n": 24, "conc": 8, "wall_s": 5.54, "tasks_per_s": 4.33, "p50_ms": 1849.1, "p99_ms": 1883.3, "wrong": 0, "fork_ms": null, "task_ms_p50": null}
+{"label": "native", "mode": "zygote", "n": 16, "conc": 1, "wall_s": 7.72, "tasks_per_s": 2.07, "p50_ms": 486.8, "p99_ms": 500.8, "wrong": 0, "fork_ms": 10.05, "task_ms_p50": 354.1}
+{"label": "native", "mode": "zygote", "n": 48, "conc": 8, "wall_s": 10.77, "tasks_per_s": 4.46, "p50_ms": 1748.0, "p99_ms": 2230.6, "wrong": 0, "fork_ms": 6.21, "task_ms_p50": 1346.1}
+{"label": "warmd", "mode": "zygote", "n": 16, "conc": 1, "wall_s": 1.98, "tasks_per_s": 8.09, "p50_ms": 125.6, "p99_ms": 129.6, "wrong": 0, "fork_ms": 6.74, "task_ms_p50": 101.0}
+{"label": "warmd", "mode": "zygote", "n": 96, "conc": 8, "wall_s": 1.63, "tasks_per_s": 58.8, "p50_ms": 135.2, "p99_ms": 150.9, "wrong": 0, "fork_ms": 4.46, "task_ms_p50": 102.8}
+{"label": "warmd", "mode": "warm", "n": 32, "conc": 1, "wall_s": 0.77, "tasks_per_s": 41.76, "p50_ms": 24.4, "p99_ms": 34.2, "wrong": 0, "fork_ms": 8.03, "task_ms_p50": 5.2}
+{"label": "warmd", "mode": "warm", "n": 256, "conc": 8, "wall_s": 1.93, "tasks_per_s": 132.96, "p50_ms": 59.7, "p99_ms": 63.1, "wrong": 0, "fork_ms": 7.14, "task_ms_p50": 5.4}
+{"label": "warmd", "mode": "pool1", "n": 512, "wall_s": 4.41, "tasks_per_s": 116.1, "p50_ms": 2200.8, "p99_ms": 4370.4, "wrong": 0}
+{"label": "warmd", "mode": "pool2", "n": 512, "wall_s": 2.23, "tasks_per_s": 229.4, "p50_ms": 1112.7, "p99_ms": 2201.5, "wrong": 0}
+{"label": "warmd", "mode": "pool4", "n": 512, "wall_s": 2.53, "tasks_per_s": 202.2, "p50_ms": 1359.8, "p99_ms": 2506.0, "wrong": 0}
+{"label": "warmd", "mode": "pool8", "n": 512, "wall_s": 2.33, "tasks_per_s": 219.5, "p50_ms": 1274.8, "p99_ms": 2311.2, "wrong": 0}

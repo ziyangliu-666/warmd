@@ -1,0 +1,12 @@
+{"bench":"copy","impl":"native","bytes":4096,"h2d_pageable_GBs":0.42,"d2h_pageable_GBs":0.36,"h2d_pinned_async_GBs":1.24,"d2h_pinned_async_GBs":1.61,"h2d_pageable_us":9.8,"d2h_pageable_us":11.5}
+{"bench":"copy","impl":"native","bytes":32768,"h2d_pageable_GBs":2.45,"d2h_pageable_GBs":1.77,"h2d_pinned_async_GBs":8.05,"d2h_pinned_async_GBs":8.28,"h2d_pageable_us":13.4,"d2h_pageable_us":18.5}
+{"bench":"copy","impl":"native","bytes":262144,"h2d_pageable_GBs":7.55,"d2h_pageable_GBs":3.26,"h2d_pinned_async_GBs":19.51,"d2h_pinned_async_GBs":11.51,"h2d_pageable_us":34.7,"d2h_pageable_us":80.5}
+{"bench":"copy","impl":"native","bytes":2097152,"h2d_pageable_GBs":11.22,"d2h_pageable_GBs":4.61,"h2d_pinned_async_GBs":24.05,"d2h_pinned_async_GBs":12.58,"h2d_pageable_us":186.9,"d2h_pageable_us":454.7}
+{"bench":"copy","impl":"native","bytes":16777216,"h2d_pageable_GBs":9.64,"d2h_pageable_GBs":6.04,"h2d_pinned_async_GBs":25.00,"d2h_pinned_async_GBs":12.81,"h2d_pageable_us":1740.5,"d2h_pageable_us":2776.7}
+{"bench":"copy","impl":"native","bytes":134217728,"h2d_pageable_GBs":9.03,"d2h_pageable_GBs":6.29,"h2d_pinned_async_GBs":24.81,"d2h_pinned_async_GBs":12.59,"h2d_pageable_us":14869.5,"d2h_pageable_us":21355.0}
+{"bench":"copy","impl":"warmd","bytes":4096,"h2d_pageable_GBs":0.15,"d2h_pageable_GBs":0.17,"h2d_pinned_async_GBs":0.13,"d2h_pinned_async_GBs":0.17,"h2d_pageable_us":27.0,"d2h_pageable_us":23.4}
+{"bench":"copy","impl":"warmd","bytes":32768,"h2d_pageable_GBs":1.10,"d2h_pageable_GBs":0.73,"h2d_pinned_async_GBs":0.84,"d2h_pinned_async_GBs":1.39,"h2d_pageable_us":29.9,"d2h_pageable_us":44.8}
+{"bench":"copy","impl":"warmd","bytes":262144,"h2d_pageable_GBs":2.99,"d2h_pageable_GBs":1.94,"h2d_pinned_async_GBs":6.47,"d2h_pinned_async_GBs":3.70,"h2d_pageable_us":87.8,"d2h_pageable_us":134.8}
+{"bench":"copy","impl":"warmd","bytes":2097152,"h2d_pageable_GBs":6.96,"d2h_pageable_GBs":3.52,"h2d_pinned_async_GBs":10.18,"d2h_pinned_async_GBs":3.72,"h2d_pageable_us":301.4,"d2h_pageable_us":595.3}
+{"bench":"copy","impl":"warmd","bytes":16777216,"h2d_pageable_GBs":4.77,"d2h_pageable_GBs":3.03,"h2d_pinned_async_GBs":4.67,"d2h_pinned_async_GBs":3.05,"h2d_pageable_us":3513.8,"d2h_pageable_us":5541.8}
+{"bench":"copy","impl":"warmd","bytes":134217728,"h2d_pageable_GBs":4.89,"d2h_pageable_GBs":2.97,"h2d_pinned_async_GBs":4.58,"d2h_pinned_async_GBs":2.93,"h2d_pageable_us":27428.8,"d2h_pageable_us":45259.9}
