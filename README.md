@@ -10,13 +10,9 @@ Since the program holds no CUDA state of its own, it can `fork()` after CUDA is 
 `warmd` Python package starts each task as a fork of a process that has already imported
 PyTorch and warmed up cuBLAS.
 
-All programs served by one daemon share its context, so they can read each other's GPU memory.
-Use one daemon per trust domain.
-
 ## Building
 
-Needs Linux x86-64, an NVIDIA driver 550 or newer (570 is the tested branch), CUDA headers,
-gcc and make.
+Needs Linux x86-64, NVIDIA driver 550 or newer, CUDA headers, gcc and make.
 
 ```console
 $ make
@@ -24,7 +20,7 @@ $ build/warmd &
 $ LD_LIBRARY_PATH=build/lib python3 -c 'import torch; print(torch.ones(2, device="cuda"))'
 ```
 
-`tests/run.sh` runs the test suite (needs a GPU and PyTorch).
+`tests/run.sh` runs the tests.
 
 ## Performance
 
@@ -46,6 +42,4 @@ Each call to the daemon adds 10 to 15 µs, and large copies run at 3 to 5 GB/s. 
 
 ## License
 
-Apache 2.0. Parts of `src/shim_dark.c` are derived from [ZLUDA](https://github.com/vosen/ZLUDA);
-see [NOTICE](NOTICE). CUDA and NVIDIA are trademarks of NVIDIA Corporation; this project is not
-affiliated with NVIDIA.
+Apache 2.0. See [NOTICE](NOTICE).

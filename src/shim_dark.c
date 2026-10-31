@@ -40,7 +40,7 @@ static uint32_t d_check_fn3(void){ return 0; }
 static CUresult d_integrity_check(uint32_t version,uint64_t secs,uint64_t*res);
 
 // {21318c60-...}: 92-entry table used by cuBLASLt heuristics. Natively cuBLASLt only calls [4](obj,u64*out,0,1,..)
-// which sets *out=1 (a capability query). Everything else logs its index (learned with src/etspy.c).
+// which sets *out=1 (a capability query). Other entries log their index and fail.
 static CUresult d21_unk(int i){ fprintf(stderr,"[warmd] export table 21318c60[%d] called -> NOT_SUPPORTED\n",i); return E_NOT_SUPPORTED; }
 #define U21(i) static CUresult d21_##i(void){ return d21_unk(i); }
 #define U21x10(p) U21(p##0) U21(p##1) U21(p##2) U21(p##3) U21(p##4) U21(p##5) U21(p##6) U21(p##7) U21(p##8) U21(p##9)

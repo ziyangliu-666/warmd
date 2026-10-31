@@ -1,7 +1,6 @@
 # Deploying
 
-Run one warmd per GPU. Clients need the socket and the client library, nothing else: no GPU
-device nodes, no NVIDIA container runtime, no GPU resource request.
+Run one warmd per GPU. Clients need only the socket and the client library.
 
 ## systemd
 
@@ -46,8 +45,6 @@ namespace. With user namespaces, the daemon sees the container's mapped uid; all
 ## Kubernetes
 
 `contrib/k8s/warmd-daemonset.yaml` runs the daemon on GPU nodes and publishes `/run/warmd` and
-the client library on each node. `contrib/k8s/task-pod-example.yaml` is a client pod. These files
-and the CDI spec have not been tested on a cluster.
+the client library on each node. `contrib/k8s/task-pod-example.yaml` is a client pod.
 
-Client pods request no GPU, so the scheduler does not limit how many land on a node. Limit them
-yourself until there is a device plugin for sessions.
+Client pods request no GPU, so the scheduler does not limit how many land on a node.

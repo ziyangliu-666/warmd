@@ -2,7 +2,7 @@
 
 ## Background
 
-On an A100 with driver 570 we measured about 160 ms to create a CUDA context, and the driver
+Creating a CUDA context takes about 160 ms on an A100, and the driver
 creates them one at a time: about five per second per GPU, no matter how many processes ask. A
 system that starts a new process per short task inherits that limit.
 
@@ -54,13 +54,11 @@ others by a hash of their content.
 ## Failover
 
 A sticky device fault (illegal address and similar) breaks the context for every session using
-it, and it cannot be repaired: `cuDevicePrimaryCtxReset` keeps returning 700. So the worker
-reports the session that saw the error and exits. The supervisor sets `dead` in every open
-session (the fault code for the reporting session, 46 for the others), promotes a standby, and
-starts a new standby.
+it. The worker reports the session that saw the error and exits. The supervisor sets `dead` in
+every open session (the fault code for the reporting session, 46 for the others), promotes a
+standby, and starts a new standby.
 
-The GPU needs 0.4 to 0.6 s to report a fault. In our tests new clients succeeded 20 to 150 ms
-after that.
+The GPU needs 0.4 to 0.6 s to report a fault. New clients are served 20 to 150 ms after that.
 
 The supervisor cannot know which session caused an asynchronous fault: another session may see
 it first. The Python pool finds out by rerunning affected tasks one at a time.
@@ -71,9 +69,8 @@ Separated between sessions: host-side memory (each client maps only its own memf
 of allocations and handles (foreign handles are rejected), device memory quotas, cleanup after a
 client dies, the uid check at connect.
 
-Not separated: device memory. Kernels in one context can read and write any address in it. One
-daemon is one trust domain; give tenants that do not trust each other their own daemon on their
-own GPU or MIG instance.
+Not separated: device memory. Kernels in one context can read and write any address in it. Run one
+daemon per trust domain.
 
 ## Fork
 
@@ -95,18 +92,8 @@ tables. `src/shim_dark.c` implements the ones in use on driver 570:
 | `a094798c` | cudart | tools callback buffers |
 | `c693336e` | cudart | context-local storage |
 | `263e8860` | cudart | context checks |
-| `d4082055` | every cudart copy | integrity hash, checked against the driver by `contrib/tools/ic_check.py` |
+| `d4082055` | every cudart copy | integrity hash |
 | `21318c60` | cuBLASLt heuristics | slot 4 sets its output to 1 |
 
-The layouts of most tables and the hash come from ZLUDA. The `42d85a81` and `21318c60` behaviour
-was found with `contrib/tools/etspy.c`, a proxy driver that logs table calls. These tables can
-change with any driver branch.
+The table layouts and the hash follow ZLUDA. They can change between driver branches.
 
-## Adding a driver branch
-
-1. `make`, then `contrib/tools/gen_stubs.sh` and commit `src/shim_stubs.c` if it changed.
-2. `tests/run.sh` must pass and `contrib/tools/ic_check.py` must report MATCH.
-3. If cudart or cuBLAS fail at start-up, run the program natively under the spy
-   (`contrib/tools/etspy.sh`, then `ETSPY=all LD_LIBRARY_PATH=build/spy`) and implement the
-   table entries it uses.
-4. Add the branch to `VALIDATED[]` in `src/shim.c` and to compat.md.

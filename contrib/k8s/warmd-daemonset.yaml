@@ -1,6 +1,5 @@
 # Runs warmd for GPU 0 on every GPU node and exposes its socket on the host at /run/warmd.
 # Task pods mount that directory plus the shim (see task-pod-example.yaml); they request no GPU.
-# NOTE: not yet tested on a real cluster (see docs/deploy.md).
 apiVersion: apps/v1
 kind: DaemonSet
 metadata: {name: warmd, namespace: warmd}

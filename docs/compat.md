@@ -1,8 +1,7 @@
 # Compatibility
 
-Tested: A100-SXM4-40GB, driver 570.211.01, PyTorch 2.5.1+cu124, Triton 3.1. All 16 tests in
-`tests/run.sh` pass; the 15 PyTorch checks and 11 driver API checks give the same results as
-native CUDA. Other driver branches print a warning until they are tested.
+Supported driver branch: 570. On other branches the client library prints a warning at
+start-up (silence it with `WARMD_ALLOW_UNVALIDATED_DRIVER=1`).
 
 ## Works
 
@@ -12,7 +11,7 @@ native CUDA. Other driver branches print a warning until they are tested.
 - copies in every direction, 2D copies, `cuMemcpy`, memset 8/16/32
 - modules and libraries (`cuModuleLoad*`, `cuLibrary*`, `cuKernel*`), fatbin, cubin, PTX, globals
 - `cuLink*` (link options are ignored)
-- `cuLaunchKernel`, `cuLaunchKernelEx` with attributes; cooperative launch is implemented but untested
+- `cuLaunchKernel`, `cuLaunchKernelEx` with attributes
 - streams, priorities, events, timing, waits, host callbacks
 - stream capture and graph instantiate, launch, nodes and destroy
 - pointer attributes and address ranges

@@ -42,9 +42,3 @@ GB/s, host to device / device to host.
 Copies go through session memory, which costs an extra CPU copy. Programs that launch many tiny
 kernels also pay the per-call cost.
 
-## Planned
-
-- Return at once from calls that only enqueue work (launch, memset, async copy, event record)
-  and report errors at the next synchronization.
-- Share pinned memory with the daemon so pinned copies need no staging.
-- More than one request slot per client, for multi-threaded programs.
