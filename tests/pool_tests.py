@@ -1,6 +1,6 @@
 """ZygotePool tests against a running warmd (env must have LD_LIBRARY_PATH + WARMD_SOCKET)."""
 import json, os, sys, time
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "launcher"))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "python"))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from warmd import ZygotePool, TaskError
 import pool_tasks

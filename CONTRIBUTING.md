@@ -1,30 +1,16 @@
 # Contributing
 
-## Building and testing
+Run `make` and `tests/run.sh` before sending a change. Changes to `src/` must keep every test
+passing, with PyTorch and driver API results equal to native CUDA. If a change affects speed,
+include numbers from `tests/bench/run.sh` and the hardware they came from.
 
-```console
-$ make
-$ tests/run.sh      # needs an NVIDIA GPU and PyTorch
-$ bench/run.sh      # optional; writes results/bench-<date>/
-```
+To add a driver function: implement it in `src/shim.c`; if it needs the GPU, add an operation to
+`src/proto.h` (bump `WD_PROTO_VERSION` if a struct changes) and handle it in `src/worker.c`,
+recording any resource it creates on the session. Add a check to `tests/driver_features.c` or
+`tests/torch_conformance.py`.
 
-A change to the shim or the daemon must keep `tests/run.sh` passing, with PyTorch and driver
-API results equal to native CUDA.
+C is C11 without allocation on the call path. Python needs 3.9 and only the standard library.
 
-## Adding a driver API function
-
-1. Implement it in `shim/shim.c`. The weak stub in `shim/stubs.c` is overridden automatically.
-2. If it needs the GPU, add an operation to `proto/warmd_proto.h`. Increase `WD_PROTO_VERSION`
-   if a structure layout changes.
-3. Handle the operation in `host/worker.c`. Record any resource it creates on the session, so
-   it is freed when the session ends, and reject handles that belong to other sessions.
-4. Add a check to `tests/driver_features.c` or `tests/torch_conformance.py`.
-
-## Other changes
-
-- New driver branch: follow `docs/new-driver.md`.
-- Documentation: follow `docs/STYLE.md`; `tools/style-check.sh` points out common problems.
-- C code is C11. Avoid allocation on the per-call path. Python code needs 3.9 or newer and only
-  the standard library.
-- Keep one topic per commit. If a change affects performance, say what you measured and on
-  which hardware.
+Documentation is short and plain. Say what a thing does, give numbers with their setup, and say
+what is not supported or not tested. No marketing words, no em dashes, no emoji, sentence-case
+headings. `contrib/tools/style-check.sh` points out common slips.

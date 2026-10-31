@@ -1,0 +1,29 @@
+# Runs warmd for GPU 0 on every GPU node and exposes its socket on the host at /run/warmd.
+# Task pods mount that directory plus the shim (see task-pod-example.yaml); they request no GPU.
+# NOTE: not yet tested on a real cluster (see docs/deploy.md).
+apiVersion: apps/v1
+kind: DaemonSet
+metadata: {name: warmd, namespace: warmd}
+spec:
+  selector: {matchLabels: {app: warmd}}
+  template:
+    metadata: {labels: {app: warmd}}
+    spec:
+      nodeSelector: {nvidia.com/gpu.present: "true"}
+      containers:
+        - name: warmd
+          image: ghcr.io/ziyangliu-666/warmd:0.1.0
+          args: ["--config", "/etc/warmd/gpu0.conf", "--allow-all"]
+          resources: {limits: {nvidia.com/gpu: 1}}
+          volumeMounts:
+            - {name: run, mountPath: /run/warmd}
+            - {name: lib, mountPath: /usr/local/lib/warmd}
+          ports: [{name: metrics, containerPort: 9400}]
+      initContainers:
+        - name: install-shim         # publish the shim on the host for task pods
+          image: ghcr.io/ziyangliu-666/warmd-client-libs:0.1.0
+          command: ["/bin/sh", "-c", "cp /opt/warmd/lib/libcuda.so.1 /host-lib/"]
+          volumeMounts: [{name: lib, mountPath: /host-lib}]
+      volumes:
+        - {name: run, hostPath: {path: /run/warmd, type: DirectoryOrCreate}}
+        - {name: lib, hostPath: {path: /usr/local/lib/warmd, type: DirectoryOrCreate}}

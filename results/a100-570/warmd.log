@@ -1,7 +1,0 @@
-2026-10-31T15:30:21.585Z INFO  [warmd 31132] listening on /tmp/warmd-bench/gpu0.sock: gpu 0, 64 sessions x 16.0 MB, 0 standby, quota 0 MB, protocol v2
-2026-10-31T15:30:21.585Z INFO  [warmd 31132] spawned worker pid 31135 (epoch 1)
-2026-10-31T15:30:22.444Z INFO  [warmd 31132] worker 31135 ready in 855 ms (GPU mem used 433 MB)
-2026-10-31T15:30:22.444Z INFO  [warmd 31132] worker 31135 promoted to ACTIVE (epoch 1)
-2026-10-31T15:30:22.444Z INFO  [worker 31135] ACTIVE with 4 dispatch threads
-2026-10-31T15:32:15.722Z INFO  [warmd 31132] shutting down
-2026-10-31T15:32:15.723Z INFO  [worker 31135] stop

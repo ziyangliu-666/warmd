@@ -8,14 +8,14 @@ B       := build
 .PHONY: all clean install test bench tools
 all: $(B)/warmd $(B)/lib/libcuda.so.1 $(B)/demo $(B)/driver_features $(B)/driver_features_native
 
-$(B)/warmd: host/warmd.c host/worker.c host/common.h proto/warmd_proto.h
+$(B)/warmd: src/warmd.c src/worker.c src/common.h src/proto.h
 	@mkdir -p $(B)
-	$(CC) $(CFLAGS) -I$(CUDA)/include host/warmd.c host/worker.c -o $@ $(LDFLAGS_EXTRA) -lcuda -lpthread
+	$(CC) $(CFLAGS) -I$(CUDA)/include src/warmd.c src/worker.c -o $@ $(LDFLAGS_EXTRA) -lcuda -lpthread
 
 # the shim: a drop-in libcuda.so.1 (put $(B)/lib on LD_LIBRARY_PATH of task processes)
-$(B)/lib/libcuda.so.1: shim/shim.c shim/dark.c shim/stubs.c shim/shim.map proto/warmd_proto.h
+$(B)/lib/libcuda.so.1: src/shim.c src/shim_dark.c src/shim_stubs.c src/shim.map src/proto.h
 	@mkdir -p $(B)/lib
-	$(CC) $(CFLAGS) -fPIC -shared shim/shim.c shim/stubs.c -o $@ -Wl,--version-script=shim/shim.map -Wl,-soname,libcuda.so.1 -lpthread -ldl
+	$(CC) $(CFLAGS) -fPIC -shared src/shim.c src/shim_stubs.c -o $@ -Wl,--version-script=src/shim.map -Wl,-soname,libcuda.so.1 -lpthread -ldl
 	ln -sf libcuda.so.1 $(B)/lib/libcuda.so
 
 # a driver-API program linked against the shim (used by tests)
@@ -29,9 +29,9 @@ $(B)/driver_features_native: tests/driver_features.c
 
 tools: $(B)/libcupti_inject.so $(B)/librmtrace.so
 CUPTI ?= $(shell python3 -c "import nvidia.cuda_cupti,os;print(os.path.dirname(nvidia.cuda_cupti.__file__))" 2>/dev/null)
-$(B)/libcupti_inject.so: tools/cupti_inject.c
+$(B)/libcupti_inject.so: contrib/tools/cupti_inject.c
 	$(CC) -O2 -shared -fPIC $< -o $@ -I$(CUDA)/include -I$(CUPTI)/include $(CUPTI)/lib/libcupti.so.12 -Wl,-rpath,$(CUPTI)/lib -lpthread
-$(B)/librmtrace.so: tools/rmtrace.c
+$(B)/librmtrace.so: contrib/tools/rmtrace.c
 	$(CC) -O2 -shared -fPIC $< -o $@ -ldl
 
 install: all
@@ -42,6 +42,6 @@ install: all
 test: all
 	tests/run.sh
 bench: all
-	bench/run.sh
+	tests/bench/run.sh
 clean:
 	rm -rf $(B)

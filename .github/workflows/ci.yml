@@ -8,7 +8,7 @@ jobs:
       - uses: actions/checkout@v4
       - run: apt-get update && apt-get install -y --no-install-recommends make gcc python3
       - run: make build/warmd build/lib/libcuda.so.1 build/demo LDFLAGS_EXTRA="-L/usr/local/cuda/lib64/stubs"
-      - run: python3 -m py_compile launcher/warmd/*.py tests/*.py bench/*.py
+      - run: python3 -m py_compile python/warmd/*.py tests/*.py tests/bench/*.py
   gpu:     # full suite on a self-hosted GPU runner (driver must be a validated branch, see compatibility.md)
     if: github.event_name == 'push'
     runs-on: [self-hosted, gpu]

@@ -265,7 +265,7 @@ def host_restart_clean_error():
 @test
 def warm_fork():
     d = default()
-    r = run([PY, f"{ROOT}/bench/torch_e2e.py", "warm", "32", "4", "shim"], d.env(), timeout=300)
+    r = run([PY, f"{ROOT}/tests/bench/torch_e2e.py", "warm", "32", "4", "shim"], d.env(), timeout=300)
     j = json.loads(r.stdout.strip().splitlines()[-1])
     report("warm_fork", j["wrong"] == 0, tasks_per_s=j["tasks_per_s"], p50_ms=j["p50_ms"])
 
