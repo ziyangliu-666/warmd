@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1680" height="960" viewBox="0 0 1680 960" role="img" aria-labelledby="title desc">
+<title id="title">Without warmd</title>
+<desc id="desc">CUDA process architecture, redrawn as editable vector shapes and text.</desc>
+<defs>
+<marker id="purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto" markerUnits="userSpaceOnUse"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#7445BC"/></marker>
+<marker id="blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto" markerUnits="userSpaceOnUse"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#087CCF"/></marker>
+<marker id="green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto" markerUnits="userSpaceOnUse"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#21813C"/></marker>
+<marker id="orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto" markerUnits="userSpaceOnUse"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#C78413"/></marker>
+</defs>
+<rect width="1680" height="960" fill="#FFFFFF"/>
+<text x="36" y="65" text-anchor="start" font-family="DejaVu Sans, Arial, sans-serif" font-size="56" font-weight="750" fill="#101828">Without warmd</text>
+<rect x="24" y="106" width="1632" height="380" rx="24" fill="#EAF2FC" stroke="none" stroke-width="1.7"/>
+<rect x="46" y="126" width="202" height="48" rx="14" fill="#D9E5F4" stroke="none" stroke-width="1.7"/>
+<text x="147.0" y="159" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="30" font-weight="700" fill="#475467">user space</text>
+<rect x="300" y="126" width="332" height="220" rx="16" fill="#F0E9FC" stroke="#7445BC" stroke-width="1.7"/>
+<text x="466.0" y="161" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="30" font-weight="700" fill="#101828">process A</text>
+<rect x="325" y="181" width="282" height="46" rx="10" fill="#FFFFFF" stroke="#7445BC" stroke-width="1.1"/>
+<text x="466.0" y="213.0" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="27" font-weight="600" fill="#101828">app / PyTorch</text>
+<rect x="325" y="234" width="282" height="46" rx="10" fill="#E4D7F7" stroke="#7445BC" stroke-width="1.1"/>
+<text x="466.0" y="266.0" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="27" font-weight="600" fill="#101828">cudart</text>
+<rect x="325" y="287" width="282" height="46" rx="10" fill="#E4D7F7" stroke="#7445BC" stroke-width="1.1"/>
+<text x="466.0" y="319.0" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="27" font-weight="600" fill="#101828">libcuda.so.1</text>
+<path d="M 466 346 L 466 386" fill="none" stroke="#7445BC" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#purple)"/>
+<rect x="315" y="389" width="302" height="60" rx="22" fill="#E4D7F7" stroke="#7445BC" stroke-width="1.7"/>
+<text x="466" y="429" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="30" font-weight="700" fill="#7445BC">CUDA context A</text>
+<rect x="738" y="126" width="332" height="220" rx="16" fill="#E7F2FF" stroke="#087CCF" stroke-width="1.7"/>
+<text x="904.0" y="161" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="30" font-weight="700" fill="#101828">process B</text>
+<rect x="763" y="181" width="282" height="46" rx="10" fill="#FFFFFF" stroke="#087CCF" stroke-width="1.1"/>
+<text x="904.0" y="213.0" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="27" font-weight="600" fill="#101828">app / PyTorch</text>
+<rect x="763" y="234" width="282" height="46" rx="10" fill="#D4E9FC" stroke="#087CCF" stroke-width="1.1"/>
+<text x="904.0" y="266.0" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="27" font-weight="600" fill="#101828">cudart</text>
+<rect x="763" y="287" width="282" height="46" rx="10" fill="#D4E9FC" stroke="#087CCF" stroke-width="1.1"/>
+<text x="904.0" y="319.0" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="27" font-weight="600" fill="#101828">libcuda.so.1</text>
+<path d="M 904 346 L 904 386" fill="none" stroke="#087CCF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#blue)"/>
+<rect x="753" y="389" width="302" height="60" rx="22" fill="#D4E9FC" stroke="#087CCF" stroke-width="1.7"/>
+<text x="904" y="429" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="30" font-weight="700" fill="#087CCF">CUDA context B</text>
+<rect x="1176" y="126" width="332" height="220" rx="16" fill="#E9F7EC" stroke="#21813C" stroke-width="1.7"/>
+<text x="1342.0" y="161" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="30" font-weight="700" fill="#101828">process C</text>
+<rect x="1201" y="181" width="282" height="46" rx="10" fill="#FFFFFF" stroke="#21813C" stroke-width="1.1"/>
+<text x="1342.0" y="213.0" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="27" font-weight="600" fill="#101828">app / PyTorch</text>
+<rect x="1201" y="234" width="282" height="46" rx="10" fill="#D8EEDC" stroke="#21813C" stroke-width="1.1"/>
+<text x="1342.0" y="266.0" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="27" font-weight="600" fill="#101828">cudart</text>
+<rect x="1201" y="287" width="282" height="46" rx="10" fill="#D8EEDC" stroke="#21813C" stroke-width="1.1"/>
+<text x="1342.0" y="319.0" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="27" font-weight="600" fill="#101828">libcuda.so.1</text>
+<path d="M 1342 346 L 1342 386" fill="none" stroke="#21813C" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#green)"/>
+<rect x="1191" y="389" width="302" height="60" rx="22" fill="#D8EEDC" stroke="#21813C" stroke-width="1.7"/>
+<text x="1342" y="429" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="30" font-weight="700" fill="#21813C">CUDA context C</text>
+<rect x="24" y="505" width="1632" height="124" rx="24" fill="#F0F3F8" stroke="none" stroke-width="1.7"/>
+<rect x="46" y="522" width="142" height="48" rx="14" fill="#DFE5ED" stroke="none" stroke-width="1.7"/>
+<text x="117.0" y="555" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="30" font-weight="700" fill="#475467">kernel</text>
+<rect x="282" y="530" width="1224" height="72" rx="19" fill="#F8FAFC" stroke="#667085" stroke-width="1.7"/>
+<text x="895" y="577" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="34" font-weight="700" fill="#101828">NVIDIA kernel driver (nvidia.ko)</text>
+<rect x="1395" y="543" width="64" height="46" rx="13" fill="#FEE4E2" stroke="none" stroke-width="1.7"/>
+<path d="M 1417 552 H 1437 M 1417 580 H 1437 M 1420 554 V 558 L 1433 573 V 578 M 1434 554 V 558 L 1421 573 V 578" fill="none" stroke="#D92D20" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M 466 449 L 466 528" fill="none" stroke="#7445BC" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#purple)"/>
+<path d="M 904 449 L 904 528" fill="none" stroke="#087CCF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#blue)"/>
+<path d="M 1342 449 L 1342 528" fill="none" stroke="#21813C" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#green)"/>
+<rect x="24" y="650" width="1632" height="176" rx="24" fill="#EFF8F2" stroke="none" stroke-width="1.7"/>
+<rect x="46" y="664" width="120" height="48" rx="14" fill="#DCEAE1" stroke="none" stroke-width="1.7"/>
+<text x="106.0" y="697" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="30" font-weight="700" fill="#475467">GPU</text>
+<rect x="255" y="681" width="1280" height="130" rx="23" fill="#E7F4E5" stroke="#21813C" stroke-width="1.7"/>
+<rect x="296" y="699" width="340" height="96" rx="17" fill="#F8FAFC" stroke="#98A2B3" stroke-width="1.5"/>
+<text x="466.0" y="741.0" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="27" font-weight="700" fill="#101828">GSP</text>
+<text x="466.0" y="771.0" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="27" font-weight="700" fill="#101828">firmware</text>
+<rect x="679" y="699" width="460" height="96" rx="17" fill="#F8FAFC" stroke="#98A2B3" stroke-width="1.5"/>
+<text x="909.0" y="757.0" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="30" font-weight="700" fill="#101828">GPU memory</text>
+<rect x="1182" y="699" width="312" height="96" rx="17" fill="#F8FAFC" stroke="#98A2B3" stroke-width="1.5"/>
+<text x="1338.0" y="757.0" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="30" font-weight="700" fill="#101828">SMs</text>
+<path d="M 896 603 L 896 679" fill="none" stroke="#087CCF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#blue)"/>
+<rect x="24" y="855" width="1632" height="82" rx="20" fill="#FFF0F1" stroke="#FECDD3" stroke-width="1.4"/>
+<path d="M 78 876 L 97 910 Q 99 914 94 914 H 62 Q 57 914 59 910 L 76 876 Q 77 874 78 876 Z" fill="none" stroke="#AE1730" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M 77 887 V 899" fill="none" stroke="#AE1730" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="77" cy="906" r="1.8" fill="#AE1730"/>
+<path d="M 141 872 V 920" fill="none" stroke="#FDA4AF" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="165" y="887" text-anchor="start" font-family="DejaVu Sans, Arial, sans-serif" font-size="28" font-weight="700" fill="#AE1730">Problem for short tasks:</text>
+<text x="165" y="919" text-anchor="start" font-family="DejaVu Sans, Arial, sans-serif" font-size="26" font-weight="400" fill="#101828">Every process pays CUDA context creation; context creation is effectively serialized.</text>
+</svg>

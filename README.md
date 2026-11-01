@@ -10,9 +10,9 @@ Since the program holds no CUDA state of its own, it can `fork()` after CUDA is 
 `warmd` Python package starts each task as a fork of a process that has already imported
 PyTorch and warmed up cuBLAS.
 
-![Without warmd](docs/img/without-warmd.png)
+![Without warmd](docs/img/without-warmd.svg)
 
-![With warmd](docs/img/with-warmd.png)
+![With warmd](docs/img/with-warmd.svg)
 
 ## Building
 
