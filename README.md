@@ -10,6 +10,10 @@ Since the program holds no CUDA state of its own, it can `fork()` after CUDA is 
 `warmd` Python package starts each task as a fork of a process that has already imported
 PyTorch and warmed up cuBLAS.
 
+![Without warmd](docs/img/without-warmd.png)
+
+![With warmd](docs/img/with-warmd.png)
+
 ## Building
 
 Needs Linux x86-64, NVIDIA driver 550 or newer, CUDA headers, gcc and make.
