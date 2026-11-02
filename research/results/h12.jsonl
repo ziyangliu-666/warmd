@@ -1,0 +1,6 @@
+{"test": "task_per_process", "mode": "warmd_copy", "gb": 7.5, "n": 8, "conc": 1, "tasks_s": 0.53, "p50_ms": 1890.2, "p99_ms": 1906.1, "wrong": 0}
+{"test": "task_per_process", "mode": "warmd_copy", "gb": 7.5, "n": 16, "conc": 4, "tasks_s": 1.45, "p50_ms": 2850.3, "p99_ms": 2867.2, "wrong": 0}
+{"test": "task_per_process", "mode": "warmd_seg", "gb": 7.5, "n": 64, "conc": 1, "tasks_s": 17.53, "p50_ms": 57.1, "p99_ms": 65.9, "wrong": 0}
+{"test": "task_per_process", "mode": "warmd_seg", "gb": 7.5, "n": 256, "conc": 8, "tasks_s": 84.5, "p50_ms": 93.3, "p99_ms": 112.8, "wrong": 256}
+{"test": "task_per_process", "mode": "native_vf", "gb": 7.5, "n": 8, "conc": 1, "tasks_s": 1.25, "p50_ms": 810.4, "p99_ms": 822.2, "wrong": 0}
+{"test": "task_per_process", "mode": "native_vf", "gb": 7.5, "n": 32, "conc": 8, "tasks_s": 3.76, "p50_ms": 2045.9, "p99_ms": 2539.5, "wrong": 0}

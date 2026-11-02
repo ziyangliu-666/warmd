@@ -1,0 +1,12 @@
+{"test": "fair_lease", "n": 256, "procs": 8, "hold_ms": null, "ops_s": 5756.3, "min_proc_ops_s": 709.3, "max_proc_ops_s": 735.2, "leases_s": 0.0, "p50_ms": 1.39, "p99_ms": 3.38}
+{"test": "fair_lease", "n": 256, "procs": 8, "hold_ms": 0.2, "ops_s": 3917.5, "min_proc_ops_s": 489.7, "max_proc_ops_s": 489.8, "leases_s": 3917.5, "p50_ms": 2.01, "p99_ms": 2.46}
+{"test": "fair_lease", "n": 256, "procs": 8, "hold_ms": 0.5, "ops_s": 10578.0, "min_proc_ops_s": 1300.2, "max_proc_ops_s": 1356.7, "leases_s": 1760.3, "p50_ms": 0.06, "p99_ms": 4.32}
+{"test": "fair_lease", "n": 256, "procs": 8, "hold_ms": 2.0, "ops_s": 15202.7, "min_proc_ops_s": 1848.0, "max_proc_ops_s": 1942.5, "leases_s": 484.2, "p50_ms": 0.06, "p99_ms": 14.77}
+{"test": "fair_lease", "n": 256, "procs": 8, "hold_ms": 10.0, "ops_s": 16693.5, "min_proc_ops_s": 2057.8, "max_proc_ops_s": 2118.8, "leases_s": 99.7, "p50_ms": 0.06, "p99_ms": 0.09}
+{"test": "fair_lease", "n": 256, "procs": 8, "hold_ms": 50.0, "ops_s": 16990.3, "min_proc_ops_s": 2097.7, "max_proc_ops_s": 2149.2, "leases_s": 20.0, "p50_ms": 0.06, "p99_ms": 0.08}
+{"test": "fair_lease", "n": 4096, "procs": 8, "hold_ms": null, "ops_s": 95.0, "min_proc_ops_s": 11.9, "max_proc_ops_s": 11.9, "leases_s": 0.0, "p50_ms": 84.88, "p99_ms": 88.92}
+{"test": "fair_lease", "n": 4096, "procs": 8, "hold_ms": 0.2, "ops_s": 108.2, "min_proc_ops_s": 13.5, "max_proc_ops_s": 13.6, "leases_s": 108.2, "p50_ms": 74.06, "p99_ms": 74.75}
+{"test": "fair_lease", "n": 4096, "procs": 8, "hold_ms": 0.5, "ops_s": 107.6, "min_proc_ops_s": 13.4, "max_proc_ops_s": 13.5, "leases_s": 107.6, "p50_ms": 74.45, "p99_ms": 75.19}
+{"test": "fair_lease", "n": 4096, "procs": 8, "hold_ms": 2.0, "ops_s": 107.0, "min_proc_ops_s": 13.4, "max_proc_ops_s": 13.4, "leases_s": 107.0, "p50_ms": 75.01, "p99_ms": 75.71}
+{"test": "fair_lease", "n": 4096, "procs": 8, "hold_ms": 10.0, "ops_s": 107.5, "min_proc_ops_s": 13.2, "max_proc_ops_s": 13.5, "leases_s": 53.8, "p50_ms": 9.36, "p99_ms": 141.88}
+{"test": "fair_lease", "n": 4096, "procs": 8, "hold_ms": 50.0, "ops_s": 108.0, "min_proc_ops_s": 13.5, "max_proc_ops_s": 13.5, "leases_s": 18.0, "p50_ms": 9.25, "p99_ms": 401.92}

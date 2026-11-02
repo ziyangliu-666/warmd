@@ -1,2 +1,7 @@
 {"test": "zoo", "model": "bert", "params": 39, "max_abs_diff": 0.0, "control_same_weights_diff": 0.0, "generate_same": null}
 {"test": "zoo", "model": "gpt2", "params": 28, "max_abs_diff": 0.0, "control_same_weights_diff": 0.0, "generate_same": true}
+{"test": "zoo", "model": "llama", "params": 21, "max_abs_diff": 0.0, "control_same_weights_diff": 0.0, "generate_same": true}
+{"test": "zoo", "model": "t5", "params": 47, "max_abs_diff": 0.0, "control_same_weights_diff": 0.0, "generate_same": null}
+{"test": "zoo", "model": "whisper", "params": 50, "max_abs_diff": 3.0919909477233887e-06, "control_same_weights_diff": 0.0, "generate_same": null}
+{"test": "zoo", "model": "vit", "params": 40, "max_abs_diff": 0.0, "control_same_weights_diff": 0.0, "generate_same": null}
+{"test": "zoo", "model": "resnet_batchnorm", "params": 21, "max_abs_diff": 0.0005999505519866943, "control_same_weights_diff": 0.0, "generate_same": null}

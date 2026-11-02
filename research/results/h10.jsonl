@@ -1,0 +1,15 @@
+{"test": "diag", "model": "resnet_batchnorm", "ref_abs_mean": 0.1422906368970871, "same_weights_new_allocation": {"max_abs_diff": 0.0, "weights_equal": true}, "again_new_allocation": {"max_abs_diff": 0.0, "weights_equal": true}, "reinstalled_vs_ref": 0.0, "mapped_align_8": {"max_abs_diff": 0.0005999505519866943, "weights_equal": true}, "mapped_align_64": {"max_abs_diff": 0.0, "weights_equal": true}, "mapped_align_4096": {"max_abs_diff": 0.0, "weights_equal": true}}
+{"test": "diag", "model": "whisper", "ref_abs_mean": 0.1273086816072464, "same_weights_new_allocation": {"max_abs_diff": 0.0, "weights_equal": true}, "again_new_allocation": {"max_abs_diff": 0.0, "weights_equal": true}, "reinstalled_vs_ref": 0.0, "mapped_align_8": {"max_abs_diff": 3.0919909477233887e-06, "weights_equal": true}, "mapped_align_64": {"max_abs_diff": 0.0, "weights_equal": true}, "mapped_align_4096": {"max_abs_diff": 0.0, "weights_equal": true}}
+{"test": "diag", "model": "bert", "ref_abs_mean": 0.8073099851608276, "same_weights_new_allocation": {"max_abs_diff": 0.0, "weights_equal": true}, "again_new_allocation": {"max_abs_diff": 0.0, "weights_equal": true}, "reinstalled_vs_ref": 0.0, "mapped_align_8": {"max_abs_diff": 0.0, "weights_equal": true}, "mapped_align_64": {"max_abs_diff": 0.0, "weights_equal": true}, "mapped_align_4096": {"max_abs_diff": 0.0, "weights_equal": true}}
+{"test": "stall", "toggle_ms": [352, 263, 344, 256, 359, 254], "outside_p50": 0.18, "outside_p99": 0.21, "outside_max": 1.87, "inside_n": 9511, "inside_p50": 0.19, "inside_p99": 0.21, "inside_max": 1.88}
+{"test": "pss", "procs": 8, "spawned_parked_mib": 943, "spawned_hibernated_mib": 1412, "zygote_forked_parked_mib": 669}
+{"test": "lease", "n": 256, "procs": 8, "hold_ms": null, "ops_s": 5717.5, "p50_ms": 1.39, "p99_ms": 3.6}
+{"test": "lease", "n": 256, "procs": 8, "hold_ms": 0.5, "ops_s": 16538.8, "p50_ms": 0.06, "p99_ms": 0.08}
+{"test": "lease", "n": 256, "procs": 8, "hold_ms": 2.0, "ops_s": 17501.3, "p50_ms": 0.06, "p99_ms": 0.07}
+{"test": "lease", "n": 256, "procs": 8, "hold_ms": 10.0, "ops_s": 16795.0, "p50_ms": 0.06, "p99_ms": 0.08}
+{"test": "lease", "n": 256, "procs": 8, "hold_ms": 50.0, "ops_s": 18583.7, "p50_ms": 0.06, "p99_ms": 0.07}
+{"test": "lease", "n": 4096, "procs": 8, "hold_ms": null, "ops_s": 97.0, "p50_ms": 83.21, "p99_ms": 86.61}
+{"test": "lease", "n": 4096, "procs": 8, "hold_ms": 0.5, "ops_s": 111.9, "p50_ms": 9.01, "p99_ms": 9.16}
+{"test": "lease", "n": 4096, "procs": 8, "hold_ms": 2.0, "ops_s": 111.6, "p50_ms": 9.01, "p99_ms": 9.23}
+{"test": "lease", "n": 4096, "procs": 8, "hold_ms": 10.0, "ops_s": 111.2, "p50_ms": 9.13, "p99_ms": 9.32}
+{"test": "lease", "n": 4096, "procs": 8, "hold_ms": 50.0, "ops_s": 115.4, "p50_ms": 9.13, "p99_ms": 9.31}

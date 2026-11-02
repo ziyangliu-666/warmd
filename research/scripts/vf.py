@@ -79,31 +79,32 @@ class Broker:
     def __init__(self, sock_path):
         self.files = {}; self.host = {}; self.lock = threading.Lock(); self.path = sock_path; init()
 
-    def _host(self, path, size):
-        """Return a DMA-ready host address for a file. Try to pin the page cache in place, so that
-        no host copy exists. Fall back to one pinned copy per file."""
+    def _host(self, path):
+        """Return a pinned image of a file, with its own layout. Tensors start on 4 KiB boundaries:
+        with safetensors' 8-byte alignment, ResNet output differed from ordinary weights by 6e-4,
+        and at 64 bytes or more it is identical. Pinning the read-only page cache fails with error 1."""
         if path in self.host:
             return self.host[path]
-        LIB.vf_mmap_file.argtypes = [ctypes.c_char_p, ctypes.c_size_t, ctypes.POINTER(ctypes.c_void_p)]
-        p = ctypes.c_void_p(); ck(LIB.vf_mmap_file(path.encode(), size, ctypes.byref(p)), "mmap")
-        r = 1 if os.environ.get("VF_HOST") == "pin" else LIB.vf_register(p, ctypes.c_size_t(size))
-        if r == 0:
-            self.host[path] = p.value; self.host_mode = "registered_page_cache"
-        else:
-            q = ctypes.c_void_p(); ck(LIB.vf_pin(ctypes.byref(q), ctypes.c_size_t(size)), "pin")
-            ctypes.memmove(q, p, size); self.host[path] = q.value; self.host_mode = f"pinned_copy (register error {r})"
-        print("host tier:", self.host_mode, path, flush=True)
+        off, hdr = read_header(path); layout = {}; pos = 0
+        for k, t in hdr.items():
+            pos = (pos + 4095) & ~4095; n = t["data_offsets"][1] - t["data_offsets"][0]
+            layout[k] = dict(t, data_offsets=[pos, pos + n]); pos += n
+        q = ctypes.c_void_p(); ck(LIB.vf_pin(ctypes.byref(q), ctypes.c_size_t(pos)), "pin")
+        fd = os.open(path, os.O_RDONLY); mm = mmap.mmap(fd, os.path.getsize(path), access=mmap.ACCESS_COPY); os.close(fd)
+        view = (ctypes.c_char * len(mm)).from_buffer(mm); base = ctypes.addressof(view)
+        for k, t in hdr.items():
+            ctypes.memmove(q.value + layout[k]["data_offsets"][0], base + off + t["data_offsets"][0], t["data_offsets"][1] - t["data_offsets"][0])
+        del view; mm.close(); self.host[path] = (q.value, pos, layout)
         return self.host[path]
 
     def load(self, name, path):
-        off, hdr = read_header(path); size = os.path.getsize(path); n = round_up(size)
+        addr, size, layout = self._host(path); n = round_up(size)
         h = U64(); ck(LIB.vf_create(ctypes.c_size_t(n), ctypes.byref(h)), "create")
         va = reserve(n); map_ro(va, n, h.value, ro=False)
-        addr = self._host(path, size)
         ck(LIB.vf_write(U64(va), ctypes.c_void_p(addr), ctypes.c_size_t(size)), "write")
         unmap(va, n)
         efd = ctypes.c_int(); ck(LIB.vf_export(h, ctypes.byref(efd)), "export")
-        self.files[name] = dict(h=h.value, fd=efd.value, size=n, off=off, hdr=hdr, path=path, gen=self.files.get(name, {}).get("gen", 0) + 1)
+        self.files[name] = dict(h=h.value, fd=efd.value, size=n, off=0, hdr=layout, path=path, gen=self.files.get(name, {}).get("gen", 0) + 1)
 
     def evict(self, name):
         f = self.files[name]; os.close(f["fd"]); release(f["h"]); f["h"] = None; f["fd"] = None

@@ -137,3 +137,77 @@ Synthetic trace: 932 requests in 300 s over twenty 1.6 GB models, with five resi
 | seven architectures on read-only weights | no faults; generate output is identical for GPT-2 and Llama |
 
 Open: Whisper and ResNet outputs differ slightly (3e-6, 6e-4). A control run is in progress.
+
+## Result 8: fixes and asynchronous replay (measured, `results/h7b.jsonl`, `results/h11.jsonl`)
+
+| design | isolated | swap mean | p50 | p99 | mean device memory | all idle |
+|---|---|---:|---:|---:|---:|---:|
+| in-process LRU, native | no | 128.5 ms | 13.4 ms | 244.8 ms | not sampled | not measured |
+| process per model, serial router | yes | 117.6 ms | 11.6 ms | 220.9 ms | not sampled | 11139 MiB |
+| process per model, async router | yes | 127.9 ms | 11.3 ms | 218.8 ms | 19832 MiB | 11139 MiB |
+| async, hibernate after 10 s idle | yes | 288.0 ms | 11.4 ms | 639.8 ms | 14289 MiB | 501 MiB |
+| async, hibernate at once | yes | 625.8 ms | 11.9 ms | 1641.8 ms | 11300 MiB | 501 MiB |
+
+All runs: 932 requests. The hibernating and async runs returned 0 wrong outputs.
+
+## Result 9: output differences (measured, `results/h10.jsonl`, `results/h8_zoo_aligned.jsonl`)
+
+Control runs on ordinary allocations show no difference, so the mapped path caused it. At 8-byte tensor alignment, ResNet differs by 6e-4 and Whisper by 3e-6. At 64 bytes and 4 KiB both differ by 0. The weights were byte-equal in every case. The broker now uses a 4 KiB layout, and all seven architectures differ by exactly 0.
+
+## Result 10: hibernation limits (measured, `results/h9.jsonl`, `results/h10.jsonl`)
+
+- Restore rate: 2.7 to 5.7 per second for 1 to 32 processes, sequential or parallel. Hibernation does not escape the driver's rate limit.
+- A checkpoint or restore does not stall kernels in another context: p99 is 0.21 ms in both cases.
+- Host memory, PSS: 943 MiB parked, 1412 MiB hibernated, 669 MiB parked after a zygote fork. Device memory returns, and host memory pays 469 MiB.
+
+## Result 11: fair lease (measured, `results/h10_lease.jsonl`)
+
+A first attempt with `mp.Lock` was invalid: one process kept the lock. A p99 of 0.08 ms exposed it. Strict round robin, 8 processes, 256 by 256 matmul:
+
+| schedule | ops/s | p50 | p99 |
+|---|---:|---:|---:|
+| driver time slicing | 5756 | 1.39 ms | 3.38 ms |
+| lease 0.2 ms | 3918 | 2.01 ms | 2.46 ms |
+| lease 2 ms | 15203 | 0.06 ms | 14.77 ms |
+| lease 10 ms | 16694 | 0.06 ms | 0.09 ms; a wait near 70 ms is below the p99 sample |
+| warmd, shared context | 22980 | 0.21 ms | 1.89 ms |
+
+Computed from the 0.2 ms row: one context switch costs about 200 µs. For 4096 by 4096 matmuls, a lease gives 108 ops/s against 95 for time slicing, and warmd gives 105.
+
+## Result 12: H2, gVisor boundary (measured in software emulation, no GPU, `results/h2.txt`)
+
+H2 is partly falsified. With `--host-uds=open`, connect, SCM_RIGHTS, mmap and shared-memory polling all work. Futex wakes do not cross the boundary: the test stopped after 6 timeouts of 200 ms. Without the flag, connect is refused. warmd needs a different wake path to run in gVisor. Latency numbers from emulation mean nothing. Device-memory files under gVisor remain untested, because the VM has no GPU.
+
+## Result 13: segments in a shared context (measured, `results/h12.jsonl`, `results/h12c.jsonl`)
+
+A copy of warmd with persistent segments (`scripts/make_warmd_seg.sh`). One new process per task, 7.5 GB model, every output checked.
+
+| design | concurrency | tasks/s | p50 | wrong |
+|---|---:|---:|---:|---:|
+| warmd today, copies weights | 1 | 0.53 | 1890 ms | 0 |
+| warmd today, copies weights | 4 | 1.45 | 2850 ms | 0 |
+| warmd with segment | 1 | 17.88 | 54 ms | 0 |
+| warmd with segment | 4 | 56.53 | 70 ms | 0 |
+| warmd with segment | 8 | 78.87 | 99 ms | 0 |
+| native context with file | 1 | 1.25 | 810 ms | 0 |
+| native context with file | 8 | 3.76 | 2046 ms | 0 |
+
+Failure kept for the record: the first segment run gave NaN in every task at concurrency 2 or more, with no error. A live block in the zygote's PyTorch allocator was inherited by each fork, so children placed scratch at the same device address. The fix: the zygote holds no allocator memory. A shared context turns this mistake into silent wrong answers.
+
+## Result 14: revocation (measured, `results/h13.jsonl`)
+
+| action on a client that does not park | result |
+|---|---|
+| broker releases the file | memory stays at 8213 MiB, and client output stays correct |
+| cuda-checkpoint with a live import | memory falls to 513 MiB in 3290 ms |
+| restore after that | fails with return code 1 after 20 s; broker had already released the file, so the cause is not separated |
+| kill the client | memory returns within 24 ms |
+
+So the safe forced reclaim is to kill the client. Park before any checkpoint.
+
+## Process lessons
+
+- A surprising good number needs a check before a bad one does. Three of mine were wrong: the 8-byte alignment "noise", the unfair lease, and NaN at 84 tasks/s.
+- Verify every output against a reference. It caught the NaN result.
+- Check for 0 MiB and no stragglers before each run.
+- Separate variables at the first odd result.

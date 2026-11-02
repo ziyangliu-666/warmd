@@ -1,3 +1,1 @@
 broker ready
-host tier: pinned_copy (register error 1) /tmp/zoo_bert.safetensors
-host tier: pinned_copy (register error 1) /tmp/zoo_gpt2.safetensors
