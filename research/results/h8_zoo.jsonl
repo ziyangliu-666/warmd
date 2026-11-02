@@ -1,0 +1,2 @@
+{"test": "zoo", "model": "bert", "params": 39, "max_abs_diff": 0.0, "control_same_weights_diff": 0.0, "generate_same": null}
+{"test": "zoo", "model": "gpt2", "params": 28, "max_abs_diff": 0.0, "control_same_weights_diff": 0.0, "generate_same": true}

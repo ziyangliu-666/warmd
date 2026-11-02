@@ -22,3 +22,13 @@ int vf_unmap(uint64_t va, size_t n) { return cuMemUnmap((CUdeviceptr)va, n); }
 int vf_release(uint64_t h) { return cuMemRelease((CUmemGenericAllocationHandle)h); }
 int vf_write(uint64_t va, const void* src, size_t n) { return cuMemcpyHtoD((CUdeviceptr)va, src, n); }
 int vf_pin(void** p, size_t n) { return cuMemHostAlloc(p, n, 0); }
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <unistd.h>
+// Map a file read-only and shared, so the host tier is the page cache itself.
+int vf_mmap_file(const char* path, size_t n, void** p) {
+  int fd = open(path, O_RDONLY); if (fd < 0) return -1;
+  *p = mmap(0, n, PROT_READ, MAP_SHARED | MAP_POPULATE, fd, 0); close(fd); return *p == MAP_FAILED ? -2 : 0;
+}
+int vf_register(void* p, size_t n) { return cuMemHostRegister(p, n, CU_MEMHOSTREGISTER_PORTABLE); }
+int vf_read(void* dst, uint64_t va, size_t n) { return cuMemcpyDtoH(dst, (CUdeviceptr)va, n); }

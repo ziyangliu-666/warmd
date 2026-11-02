@@ -105,4 +105,35 @@ The result suggests that two things warmd joined should be separate:
 - Weights are immutable data. They do not need a shared context, a shim, or a process that stays alive.
 - A context is a trust domain and a time-slice unit. Share one only when processes trust each other and run short kernels at the same time.
 
-Open: 2032 MiB remains after eviction with one client and one broker, so a parked process costs more than a bare context. Find out what that is.
+## Correction to Result 5
+
+Two stale processes held 995 MiB during Result 5. Clean numbers are in `results/h6b_park_clean.jsonl`: 8199 MiB mapped, 1041 MiB evicted. The 1041 MiB is two contexts (broker and client). Per-process deltas and timings are unchanged. Process: kill stragglers and check that memory is 0 MiB before each run.
+
+## Result 6: long-tail replay, first pass (measured, `results/h7.jsonl`)
+
+Synthetic trace: 932 requests in 300 s over twenty 1.6 GB models, with five resident. There is no real production trace, so this does not measure real idle share.
+
+| design | isolated | miss rate | swap mean | p50 | p99 |
+|---|---|---:|---:|---:|---:|
+| in-process LRU, native | no | 25.6% | 129 ms | 11.8 ms | 259 ms |
+| in-process LRU, warmd | no | 25.6% | 325 ms | 99.6 ms | 967 ms |
+| one process per model, device-memory files | yes | 25.6% | 311 ms | 68.1 ms | 878 ms |
+| simulated scale-to-zero, favoured baseline | yes | 25.6% | n/a | 2003 ms | 3890 ms |
+
+- Errors of mine: the first simulation let cold starts block the GPU queue, and H4 reported a 193 ms service time that included warm-up. The table uses the fixed simulation (`results/h7_sim.jsonl`).
+- H4 is not falsified: 15 times better p99 than the favoured baseline, on a synthetic trace.
+- The device-memory design was slow because it copied from pageable memory. It also kept 4.6 GB of allocator cache in idle processes. Both are fixed for the next run.
+- 20 idle contexts cost 11135 MiB, which is 27% of the GPU.
+
+## Result 7: properties beyond the happy path (measured, `results/h8.jsonl`)
+
+| test | result |
+|---|---|
+| pin a read-only page-cache mapping | fails with error 1, so the host tier needs a pinned copy; falsified my zero-copy idea |
+| first load with a pinned copy, 7.5 GB | 7.6 s, against 1.0 s without pinning; this is a new cost |
+| fork after import to first result | 0.57 to 0.58 s (1.6 GB), 0.64 to 0.66 s (7.5 GB), weights resident; native full start is 4.35 s for 7.5 GB |
+| new device memory after another process wrote and freed | 0 nonzero values, in the same process and in a new one |
+| cuda-checkpoint on a parked process | frees 532 MiB; checkpoint 376 ms, restore 235 ms, then resume and forward 6 ms, same output |
+| seven architectures on read-only weights | no faults; generate output is identical for GPT-2 and Llama |
+
+Open: Whisper and ResNet outputs differ slightly (3e-6, 6e-4). A control run is in progress.

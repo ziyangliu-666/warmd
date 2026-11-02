@@ -1,0 +1,7 @@
+2026-11-02T14:38:23.298Z INFO  [warmd 44178] listening on /tmp/warmd-exp/gpu0.sock: gpu 0, 64 sessions x 16.0 MB, 0 standby, quota 0 MB, protocol v2
+2026-11-02T14:38:23.298Z INFO  [warmd 44178] spawned worker pid 44181 (epoch 1)
+2026-11-02T14:38:24.227Z INFO  [warmd 44178] worker 44181 ready in 925 ms (GPU mem used 433 MB)
+2026-11-02T14:38:24.227Z INFO  [warmd 44178] worker 44181 promoted to ACTIVE (epoch 1)
+2026-11-02T14:38:24.227Z INFO  [worker 44181] ACTIVE with 4 dispatch threads
+2026-11-02T14:43:44.587Z INFO  [warmd 44178] shutting down
+2026-11-02T14:43:44.598Z INFO  [worker 44181] stop

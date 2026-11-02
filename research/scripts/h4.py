@@ -59,7 +59,7 @@ def serve(i):
     torch.cuda.synchronize(); busy += time.perf_counter() - t
 
 ids = torch.randint(0, 32000, (1, 512), device="cuda")
-load(0); t = time.perf_counter()
+load(0); serve(0); t = time.perf_counter()   # The first pass includes kernel load, so it is not a service time.
 for _ in range(5): serve(0)
 svc = (time.perf_counter() - t) / 5
 swap_s = busy = 0.0; misses = 0
