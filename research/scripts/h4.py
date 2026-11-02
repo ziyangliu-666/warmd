@@ -15,6 +15,8 @@ impl, rate, secs = sys.argv[1], float(sys.argv[2]), float(sys.argv[3])
 NMODELS, FIT, GB = 20, 5, 2
 
 def trace():
+    if os.environ.get("TRACE"):
+        return [tuple(x) for x in json.load(open(os.environ["TRACE"]))]
     rng = random.Random(7); out = []
     weights = [1 / (i + 1) for i in range(NMODELS)]; total = sum(weights)
     for i, w in enumerate(weights):

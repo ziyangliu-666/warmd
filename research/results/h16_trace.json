@@ -1,0 +1,126 @@
+{
+ "functions": 46412,
+ "invocations": 909783379,
+ "top_1pct_share": 0.9126,
+ "top_10pct_share": 0.9916,
+ "under_1_per_hour": 0.443,
+ "under_1_per_minute": 0.867,
+ "median_daily": 32,
+ "idle_share": [
+  {
+   "group": "all",
+   "functions": 46412,
+   "keep_min": 1,
+   "resident_gpu_hours": 223829,
+   "cold_starts": 2612704,
+   "cold_per_invocation": 0.0029,
+   "idle_share_svc_0.1s": 0.9675,
+   "idle_share_svc_1.0s": 0.8844,
+   "idle_share_svc_10.0s": 0.6639
+  },
+  {
+   "group": "all",
+   "functions": 46412,
+   "keep_min": 5,
+   "resident_gpu_hours": 342039,
+   "cold_starts": 658312,
+   "cold_per_invocation": 0.0007,
+   "idle_share_svc_0.1s": 0.9787,
+   "idle_share_svc_1.0s": 0.9244,
+   "idle_share_svc_10.0s": 0.7801
+  },
+  {
+   "group": "all",
+   "functions": 46412,
+   "keep_min": 10,
+   "resident_gpu_hours": 389209,
+   "cold_starts": 416677,
+   "cold_per_invocation": 0.0005,
+   "idle_share_svc_0.1s": 0.9813,
+   "idle_share_svc_1.0s": 0.9335,
+   "idle_share_svc_10.0s": 0.8067
+  },
+  {
+   "group": "all",
+   "functions": 46412,
+   "keep_min": 60,
+   "resident_gpu_hours": 535389,
+   "cold_starts": 84252,
+   "cold_per_invocation": 0.0001,
+   "idle_share_svc_0.1s": 0.9864,
+   "idle_share_svc_1.0s": 0.9517,
+   "idle_share_svc_10.0s": 0.8595
+  },
+  {
+   "group": "tail_under_1_per_minute",
+   "functions": 40224,
+   "keep_min": 1,
+   "resident_gpu_hours": 110405,
+   "cold_starts": 2398068,
+   "cold_per_invocation": 0.445,
+   "idle_share_svc_0.1s": 0.9986,
+   "idle_share_svc_1.0s": 0.9868,
+   "idle_share_svc_10.0s": 0.8807
+  },
+  {
+   "group": "tail_under_1_per_minute",
+   "functions": 40224,
+   "keep_min": 5,
+   "resident_gpu_hours": 219785,
+   "cold_starts": 600610,
+   "cold_per_invocation": 0.1114,
+   "idle_share_svc_0.1s": 0.9993,
+   "idle_share_svc_1.0s": 0.9934,
+   "idle_share_svc_10.0s": 0.9401
+  },
+  {
+   "group": "tail_under_1_per_minute",
+   "functions": 40224,
+   "keep_min": 10,
+   "resident_gpu_hours": 263635,
+   "cold_starts": 387080,
+   "cold_per_invocation": 0.0718,
+   "idle_share_svc_0.1s": 0.9994,
+   "idle_share_svc_1.0s": 0.9945,
+   "idle_share_svc_10.0s": 0.95
+  },
+  {
+   "group": "tail_under_1_per_minute",
+   "functions": 40224,
+   "keep_min": 60,
+   "resident_gpu_hours": 402342,
+   "cold_starts": 76043,
+   "cold_per_invocation": 0.0141,
+   "idle_share_svc_0.1s": 0.9996,
+   "idle_share_svc_1.0s": 0.9964,
+   "idle_share_svc_10.0s": 0.9673
+  }
+ ],
+ "replay": {
+  "requests": 1024,
+  "secs": 600,
+  "candidates": 18319,
+  "per_model": [
+   631,
+   147,
+   103,
+   72,
+   24,
+   10,
+   10,
+   8,
+   3,
+   3,
+   2,
+   2,
+   2,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1
+  ]
+ }
+}

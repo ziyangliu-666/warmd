@@ -55,14 +55,15 @@ warmd stays useful for the second and third rows. On the second row, a segment m
 - The driver limit stays. New contexts and restores both run at about 3 to 6 per second per GPU.
 - Host memory becomes the limit. A hibernated process costs 1412 MiB PSS, or an estimated 1137 MiB after a zygote fork (computed: 669 + 469). 62 GB holds about 50.
 - Weights must be immutable. Training and in-place updates need ordinary memory.
+- A segment frees weights only. vLLM keeps a 3.46 GiB KV pool while parked, so an engine must release its mutable pool too.
 - A client must cooperate to release a mapping. The safe forced path is to kill it.
 - The first load with a pinned copy is slow: 7.6 s for 7.5 GB. A pinned staging pool may help, at about 15 GB/s (Result 4); this is not integrated.
 - Weights are not encrypted or hidden from tenants that map them. Share a segment only when both tenants may read it.
 
 ## What is not proven
 
-- Traces are synthetic, so the real fleet saving is unknown. It depends on the share of GPU time spent idle with weights resident.
-- All weights are random. Timing and correctness do not depend on values, but no real checkpoint ran.
+- The real arrival trace comes from CPU functions (Result 18). It shows a large idle share for that shape, but no GPU fleet data was available. The real saving is unknown.
+- One real checkpoint and vLLM 0.6.6 work (Result 16), on one small model. Other engines and larger models are not tested.
 - One GPU model, one driver branch, PyTorch only, no multi-GPU models.
 - A second uid works: uid 65534 mapped a root broker's segment, with the same output and 12.08 ms per forward pass. Everything ran in one container, because the rented container cannot create namespaces. A forum report says exported fds do not cross containers, and NVIDIA's documentation ties multi-user isolation to IMEX channels. Neither is tested. This is the largest open risk.
 - Device-memory files under gVisor are untested.
@@ -74,8 +75,8 @@ The exact combination did not appear in two searches, which is weak evidence. Cl
 ## Next experiments, in order
 
 1. Share a segment across two containers. This needs a machine that allows namespaces. If it fails, the multi-tenant case needs another path.
-2. Measure the idle share on a real fleet trace. If it is low, there is little to reclaim.
-3. Run real checkpoints, and a real serving engine such as vLLM with its KV cache.
+2. Measure the idle share on a GPU fleet trace. If it is low, there is little to reclaim.
+3. Release the engine's KV pool at park, using vLLM's sleep support or a patch.
 4. Run under gVisor with a GPU.
 
 ## Reproduce

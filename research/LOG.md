@@ -209,6 +209,32 @@ So the safe forced reclaim is to kill the client. Park before any checkpoint.
 
 uid 65534 mapped a segment from a root broker: output 27.136173248291016, 12.08 ms per forward pass. The device nodes here are world-writable. Cross-container sharing is still untested, because this container cannot create namespaces.
 
+## Result 16: real checkpoint and real engine (measured, `results/h15.jsonl`, `results/h15_hf.jsonl`)
+
+Qwen2.5-0.5B, a real checkpoint, downloaded.
+
+| test | result |
+|---|---|
+| transformers, mapped bfloat16 weights | logits differ by 0; generated text identical; 2.69 s against 2.70 s |
+| vLLM 0.6.6, weights replaced by a segment | text identical; 0.750 s against 0.741 s |
+| vLLM after park, evict and resume | text identical; resume with reload 45.8 ms |
+| vLLM memory: ordinary, mapped with broker, parked and evicted | 5595, 5823, 4879 MiB |
+
+- Two false alarms were my tests: the native path first ran in float32, and `from_config` does not read `generation_config.json`. Comparing logits separated model from generation settings.
+- New limit: vLLM keeps its KV pool (3.46 GiB here) while parked. A segment frees weights only. An engine must release its mutable pool to reach the state ladder.
+
+## Result 17: exported fd (measured, `results/h15.jsonl`)
+
+The fd is `/dev/nvidiactl` (195:255). A process imported it after the exporter had released its handle and exited, and read back correct data. So a segment does not depend on the exporter process. This narrows the cross-container question but does not answer it.
+
+## Result 18: real arrival shape (computed, `results/h16_trace.json`)
+
+Azure Functions 2019, day 1, 46412 functions, 909 million invocations. These are CPU functions, so this gives arrival shape only. GPU workloads may differ.
+
+- The top 1% of functions make 91.3% of invocations. 86.7% run under once per minute. The median is 32 per day.
+- Idle share of resident time, keep-alive 5 minutes: 78% to 98% for all functions, and 94% to 99.9% for the tail, for service times of 10 s to 0.1 s.
+- Cold starts per invocation in the tail: 44.5% at 1 minute keep-alive, 11.1% at 5, 7.2% at 10, 1.4% at 60.
+
 ## Process lessons
 
 - A surprising good number needs a check before a bad one does. Three of mine were wrong: the 8-byte alignment "noise", the unfair lease, and NaN at 84 tasks/s.

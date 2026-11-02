@@ -4,10 +4,12 @@ The simulation favours the baseline. Cold starts run in parallel with no CPU or 
 and never hold the GPU, although a real cold start copies its weights. A request waits for its own
 container, then for the GPU. Containers stay warm for `keep` idle seconds, and at most five are warm.
 """
-import heapq, json, random, sys
+import heapq, json, os, random, sys
 rate, secs, cold, svc = float(sys.argv[1]), float(sys.argv[2]), float(sys.argv[3]), float(sys.argv[4])
 N = 20
 def trace():
+    if os.environ.get("TRACE"):
+        return [tuple(x) for x in json.load(open(os.environ["TRACE"]))]
     rng = random.Random(7); out = []
     w = [1 / (i + 1) for i in range(N)]; total = sum(w)
     for i, x in enumerate(w):

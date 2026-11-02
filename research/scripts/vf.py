@@ -41,7 +41,7 @@ def release(h):
     ck(LIB.vf_release(U64(h)), "release")
 
 # --- safetensors layout: the file on disk is already a flat image of the device-memory file.
-DTYPES = {"F16": (torch.float16, 2, 16, 2), "F32": (torch.float32, 2, 32, 4), "I64": (torch.int64, 0, 64, 8)}
+DTYPES = {"BF16": (torch.bfloat16, 4, 16, 2), "F16": (torch.float16, 2, 16, 2), "F32": (torch.float32, 2, 32, 4), "I64": (torch.int64, 0, 64, 8)}
 
 def read_header(path):
     with open(path, "rb") as f:

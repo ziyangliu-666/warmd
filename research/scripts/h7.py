@@ -14,6 +14,8 @@ HIBERNATE = os.environ.get("HIBERNATE") == "1"; TOOL = "/workspace/exp/cuda-chec
 rate, secs = float(sys.argv[1]), float(sys.argv[2])
 
 def trace():
+    if os.environ.get("TRACE"):
+        return [tuple(x) for x in json.load(open(os.environ["TRACE"]))]
     # Same generator and seed as h4.py, so both runs replay identical requests.
     rng = random.Random(7); out = []
     weights = [1 / (i + 1) for i in range(NMODELS)]; total = sum(weights)
