@@ -235,6 +235,34 @@ Azure Functions 2019, day 1, 46412 functions, 909 million invocations. These are
 - Idle share of resident time, keep-alive 5 minutes: 78% to 98% for all functions, and 94% to 99.9% for the tail, for service times of 10 s to 0.1 s.
 - Cold starts per invocation in the tail: 44.5% at 1 minute keep-alive, 11.1% at 5, 7.2% at 10, 1.4% at 60.
 
+## Result 19: real arrival window replayed on the GPU (measured, `results/h17.jsonl`, `results/h17_sim.jsonl`)
+
+Ten real minutes of Azure Functions day 1, 1024 requests, twenty 1.6 GB models with five resident. Arrivals within a minute are random, because the trace has one-minute resolution. All measured runs report 0 wrong outputs where checked.
+
+| design | isolated | misses | p50 | p99 | mean device memory | all idle |
+|---|---|---:|---:|---:|---:|---:|
+| in-process LRU, native | no | 76 | 11.0 ms | 147.2 ms | not sampled | not measured |
+| process per model, segments | yes | 77 | 11.8 ms | 141.2 ms | 19875 MiB | 11139 MiB |
+| hibernate after 60 s idle | yes | 78 | 11.8 ms | 431.0 ms | 13887 MiB | 501 MiB |
+| hibernate after 10 s idle | yes | 78 | 11.9 ms | 412.6 ms | 12349 MiB | 501 MiB |
+| simulated scale-to-zero, favoured baseline | yes | 77 | 11.0 ms | 3891 ms | n/a | n/a |
+
+The GPU ran inference for under 2% of the window. This is one window with one random sample of functions.
+
+## Result 20: full state ladder on vLLM (measured, `results/h18.jsonl`)
+
+Qwen2.5-0.5B, vLLM 0.6.6, three prompts, 64 tokens. At park the process unmaps weights and drops the KV pool; at wake it rebuilds the pool. The test reaches into vLLM internals, with no request in flight. Output is identical to the original in every state.
+
+| state | idle device memory, with broker | overhead before generate | time to result |
+|---|---:|---:|---:|
+| running | 5823 MiB | 0 | 0.78 s |
+| parked | 2271 MiB | 92 ms | 0.87 s |
+| hibernated | 1447 MiB | 662 ms | 1.44 s |
+| hibernated, segment evicted | 503 MiB | 719 ms | 1.50 s |
+| real cold start, page cache warm | 0 | 21.19 s (computed) | 21.97 s |
+
+Computed: 14.6 times faster to the first result than a real cold start, with 11.6 times less device memory than running. The 503 MiB is the broker's context, which many processes share. Limits: the KV pool's contents are lost, so prefix caching does not survive; the first load used a saved copy of the engine's own weights.
+
 ## Process lessons
 
 - A surprising good number needs a check before a bad one does. Three of mine were wrong: the 8-byte alignment "noise", the unfair lease, and NaN at 84 tasks/s.

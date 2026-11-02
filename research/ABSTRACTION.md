@@ -38,6 +38,10 @@ The cold start is no longer one number. It is a ladder:
 | no process, zygote available, segment resident | 0 | 0.65 s, 7.5 GB model |
 | full native start, page cache warm | 0 | 4.35 s, 7.5 GB model |
 
+On a real engine, vLLM with Qwen2.5-0.5B, the lowest state holds 503 MiB of shared broker context and reaches the same output in 1.50 s. A real cold start takes 21.97 s (Result 20).
+
+On ten real minutes of arrivals, isolated processes on segments reach a p99 of 141 ms, against 147 ms for one unisolated process and 3891 ms for a favoured scale-to-zero simulation (Result 19).
+
 ## Where it sits against warmd
 
 warmd joined two ideas. The separation shows that they are independent choices:
@@ -55,7 +59,7 @@ warmd stays useful for the second and third rows. On the second row, a segment m
 - The driver limit stays. New contexts and restores both run at about 3 to 6 per second per GPU.
 - Host memory becomes the limit. A hibernated process costs 1412 MiB PSS, or an estimated 1137 MiB after a zygote fork (computed: 669 + 469). 62 GB holds about 50.
 - Weights must be immutable. Training and in-place updates need ordinary memory.
-- A segment frees weights only. vLLM keeps a 3.46 GiB KV pool while parked, so an engine must release its mutable pool too.
+- A segment frees weights only. vLLM keeps a 3.46 GiB KV pool unless the process releases it at park. Result 20 does this through engine internals, and the pool's contents are lost.
 - A client must cooperate to release a mapping. The safe forced path is to kill it.
 - The first load with a pinned copy is slow: 7.6 s for 7.5 GB. A pinned staging pool may help, at about 15 GB/s (Result 4); this is not integrated.
 - Weights are not encrypted or hidden from tenants that map them. Share a segment only when both tenants may read it.
@@ -76,7 +80,7 @@ The exact combination did not appear in two searches, which is weak evidence. Cl
 
 1. Share a segment across two containers. This needs a machine that allows namespaces. If it fails, the multi-tenant case needs another path.
 2. Measure the idle share on a GPU fleet trace. If it is low, there is little to reclaim.
-3. Release the engine's KV pool at park, using vLLM's sleep support or a patch.
+3. Turn the vLLM result into a supported interface, and test a larger model with requests in flight.
 4. Run under gVisor with a GPU.
 
 ## Reproduce
