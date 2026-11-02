@@ -205,6 +205,10 @@ Failure kept for the record: the first segment run gave NaN in every task at con
 
 So the safe forced reclaim is to kill the client. Park before any checkpoint.
 
+## Result 15: second uid (measured, `results/h14_uid.txt`)
+
+uid 65534 mapped a segment from a root broker: output 27.136173248291016, 12.08 ms per forward pass. The device nodes here are world-writable. Cross-container sharing is still untested, because this container cannot create namespaces.
+
 ## Process lessons
 
 - A surprising good number needs a check before a bad one does. Three of mine were wrong: the 8-byte alignment "noise", the unfair lease, and NaN at 84 tasks/s.

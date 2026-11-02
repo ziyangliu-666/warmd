@@ -64,7 +64,7 @@ warmd stays useful for the second and third rows. On the second row, a segment m
 - Traces are synthetic, so the real fleet saving is unknown. It depends on the share of GPU time spent idle with weights resident.
 - All weights are random. Timing and correctness do not depend on values, but no real checkpoint ran.
 - One GPU model, one driver branch, PyTorch only, no multi-GPU models.
-- Everything ran in one container. A forum report says exported fds do not cross containers, and NVIDIA's documentation ties multi-user isolation to IMEX channels. Neither is tested. This is the largest open risk.
+- A second uid works: uid 65534 mapped a root broker's segment, with the same output and 12.08 ms per forward pass. Everything ran in one container, because the rented container cannot create namespaces. A forum report says exported fds do not cross containers, and NVIDIA's documentation ties multi-user isolation to IMEX channels. Neither is tested. This is the largest open risk.
 - Device-memory files under gVisor are untested.
 
 ## Prior work
@@ -73,7 +73,7 @@ The exact combination did not appear in two searches, which is weak evidence. Cl
 
 ## Next experiments, in order
 
-1. Share a segment across two containers and two uids. If this fails, the multi-tenant case needs another path.
+1. Share a segment across two containers. This needs a machine that allows namespaces. If it fails, the multi-tenant case needs another path.
 2. Measure the idle share on a real fleet trace. If it is low, there is little to reclaim.
 3. Run real checkpoints, and a real serving engine such as vLLM with its KV cache.
 4. Run under gVisor with a GPU.
