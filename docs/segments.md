@@ -35,6 +35,14 @@ If the broker evicted the segment, `resume` waits while the broker loads it agai
 
 To free the context's device memory too (about 500 MiB for a PyTorch process on an A100), checkpoint the parked process with `cuda-checkpoint --toggle`. Restore took 121 ms on an RTX 3060 with `CUDA_DEVICE_MAX_CONNECTIONS=1`, and 229 ms without it.
 
+## Memory budget
+
+`--budget-gib 30` caps the device memory of all segments. To load a new one past the cap, the broker evicts the least recently used segments that no client maps. If every loaded segment is mapped, the open fails.
+
+## Broker restart
+
+Mappings survive a broker crash: clients keep running on the memory they map. A client reconnects on its next call. After a restart, `resume` loads a fresh copy and returns True; the old copy is freed when the last client parks.
+
 ## Access
 
 - The socket is mode 0660 by default. `--allow-uid` adds uids that may open segments.

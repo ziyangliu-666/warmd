@@ -55,6 +55,20 @@ def _try_evict(c):
         return False
 
 
+def client_survives_broker_restart(sock, q):
+    from warmd.segments import Client
+    c = Client(sock)
+    t = c.open("m")
+    a = float((t["w"] @ t["w"]).sum())
+    q.put("ready")
+    import time
+    time.sleep(6)                       # the test restarts the broker meanwhile
+    still = float((t["w"] @ t["w"]).sum()) == a
+    c.park("m")
+    changed = c.resume("m")
+    q.put((still, changed, float((t["w"] @ t["w"]).sum()) == a))
+
+
 def client_write(sock, q):
     import torch
     from warmd.segments import Client
@@ -69,17 +83,23 @@ def client_write(sock, q):
 
 class SegmentGpuTests(unittest.TestCase):
     @classmethod
-    def setUpClass(cls):
-        cls.dir = tempfile.mkdtemp()
-        cls.file = os.path.join(cls.dir, "m.safetensors")
-        make_file(cls.file)
-        cls.sock = os.path.join(cls.dir, "seg.sock")
+    def start_broker(cls):
         env = dict(os.environ, PYTHONPATH=os.path.join(ROOT, "python"))
+        if os.path.exists(cls.sock):
+            os.unlink(cls.sock)
         cls.broker = subprocess.Popen([sys.executable, "-m", "warmd.segments", "--socket", cls.sock, "--file", f"m={cls.file}"], env=env)
         for _ in range(200):
             if os.path.exists(cls.sock):
                 break
             time.sleep(0.05)
+
+    @classmethod
+    def setUpClass(cls):
+        cls.dir = tempfile.mkdtemp()
+        cls.file = os.path.join(cls.dir, "m.safetensors")
+        make_file(cls.file)
+        cls.sock = os.path.join(cls.dir, "seg.sock")
+        cls.start_broker()
         cls.ctx = mp.get_context("spawn")
 
     @classmethod
@@ -101,6 +121,17 @@ class SegmentGpuTests(unittest.TestCase):
 
     def test_evict_is_refused_while_mapped_and_resume_reloads(self):
         self.assertEqual(self.run_child(client_evict), (True, True, True, True))
+
+    def test_mappings_survive_a_broker_restart(self):
+        q = self.ctx.Queue()
+        p = self.ctx.Process(target=client_survives_broker_restart, args=(self.sock, q))
+        p.start()
+        self.assertEqual(q.get(timeout=120), "ready")
+        self.broker.kill()
+        self.broker.wait()
+        self.start_broker()
+        self.assertEqual(q.get(timeout=120), (True, True, True))
+        p.join()
 
     def test_a_store_faults_the_writer_and_not_the_next_client(self):
         self.assertEqual(self.run_child(client_write), "faulted")

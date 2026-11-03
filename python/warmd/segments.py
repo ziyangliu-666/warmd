@@ -177,10 +177,13 @@ class CudaDevice:
             self.host[path] = (identity, p.value, total)
             return p.value, total
 
+    def size_for(self, total):
+        return round_up(max(total, 1), self.granularity)
+
     def load(self, path, layout, total):
         """Create device memory, fill it, and return (handle, fd, size)."""
         addr, _ = self._host_image(path, layout, total)
-        size = round_up(max(total, 1), self.granularity)
+        size = self.size_for(total)
         h, va, fd = ctypes.c_uint64(), ctypes.c_uint64(), ctypes.c_int()
         _check(self.lib.seg_create(ctypes.c_size_t(size), ctypes.byref(h)), "create")
         try:
@@ -208,9 +211,11 @@ class Broker:
 
     allow_uids: uids that may open segments; None means the broker's own uid and root.
     admin_uids: uids that may evict; the broker's own uid and root.
+    budget: bytes of device memory for all segments. To load past it, the broker evicts the
+            least recently used segments that no client maps. If that is not enough, open fails.
     """
 
-    def __init__(self, files, device=None, allow_uids=None):
+    def __init__(self, files, device=None, allow_uids=None, budget=None):
         self.files = dict(files)
         self.device = device if device is not None else CudaDevice()
         me = os.getuid()
@@ -219,8 +224,41 @@ class Broker:
         self.loaded = {}         # name -> dict(handle, fd, size, layout, generation)
         self.generation = {}
         self.mapped = {}         # name -> number of clients that map the loaded generation
+        self.budget = budget
+        self.used_at = {}        # name -> counter value at last open or release, for LRU
+        self.clock = 0
         self.lock = threading.Lock()                          # guards the dicts only
         self.load_locks = {n: threading.Lock() for n in self.files}   # a slow load blocks its own name only
+
+    def _touch(self, name):
+        self.clock += 1
+        self.used_at[name] = self.clock
+
+    def _make_room(self, name, need):
+        """Evict unmapped segments, least recently used first, until `need` bytes fit."""
+        if self.budget is None:
+            return True
+        while True:
+            with self.lock:
+                used = sum(v["size"] for v in self.loaded.values())
+                if used + need <= self.budget:
+                    return True
+                idle = sorted((self.used_at.get(n, 0), n) for n in self.loaded if n != name and not self.mapped.get(n))
+            for _, victim in idle:
+                lock = self.load_locks[victim]
+                if lock.acquire(blocking=False):      # skip a segment that is loading or opening now
+                    try:
+                        with self.lock:
+                            v = self.loaded.get(victim)
+                            if v is not None and not self.mapped.get(victim):
+                                del self.loaded[victim]
+                                self.mapped.pop(victim, None)
+                                self.device.release(v["handle"], v["fd"])
+                                break
+                    finally:
+                        lock.release()
+            else:
+                return False
 
     def new_connection(self):
         return {}                # name -> times this connection mapped the loaded generation
@@ -255,6 +293,8 @@ class Broker:
                     try:
                         start, header = read_header(self.files[name])
                         layout, total = plan(header, os.path.getsize(self.files[name]), start)
+                        if not self._make_room(name, self.device.size_for(total)):
+                            return dict(ok=False, error="device memory budget is full of mapped segments"), None
                         handle, fd, size = self.device.load(self.files[name], layout, total)
                     except (OSError, ValueError, SegmentError) as e:
                         return dict(ok=False, error=f"load failed: {e}"), None
@@ -265,6 +305,7 @@ class Broker:
                 with self.lock:
                     self.mapped[name] += 1
                     conn[name] = conn.get(name, 0) + 1
+                    self._touch(name)
                 public = {k: {f: v[f] for f in ("dtype", "shape", "offset", "nbytes")} for k, v in s["layout"].items()}
                 return dict(ok=True, size=s["size"], layout=public, generation=s["generation"]), s["fd"]
         if op == "release":
@@ -272,6 +313,7 @@ class Broker:
                 if conn.get(name, 0) > 0:
                     conn[name] -= 1
                     self.mapped[name] = max(0, self.mapped.get(name, 0) - 1)
+                    self._touch(name)
             return dict(ok=True), None
         if op == "evict":
             if uid not in self.admin:
@@ -366,15 +408,26 @@ class Client:
     def __init__(self, path, device_index=0):
         import torch
         torch.zeros(1, device=f"cuda:{device_index}")     # make PyTorch's context current
-        self.lib, self.device_index = _library(), device_index
-        self.sock = socket.socket(socket.AF_UNIX)
-        self.sock.connect(path)
-        self.buffer = bytearray()
+        self.lib, self.device_index, self.path = _library(), device_index, path
+        self._connect()
         self.maps = {}
 
+    def _connect(self):
+        self.sock = socket.socket(socket.AF_UNIX)
+        self.sock.connect(self.path)
+        self.buffer = bytearray()
+
     def _call(self, **req):
-        send_message(self.sock, req)
-        reply, fd = recv_message(self.sock, self.buffer)
+        """Send a request. If the broker restarted, connect again and retry once. Mappings made
+        before the restart stay valid; resume() then reports a new generation."""
+        try:
+            send_message(self.sock, req)
+            reply, fd = recv_message(self.sock, self.buffer)
+        except (EOFError, ConnectionError, OSError):
+            self.sock.close()
+            self._connect()
+            send_message(self.sock, req)
+            reply, fd = recv_message(self.sock, self.buffer)
         if not reply.get("ok"):
             if fd is not None:
                 os.close(fd)
@@ -463,10 +516,12 @@ def main(argv=None):
     ap.add_argument("--allow-uid", action="append", type=int, default=[], help="a uid that may open segments")
     ap.add_argument("--device", type=int, default=0)
     ap.add_argument("--mode", type=lambda s: int(s, 8), default=0o660, help="socket file mode, octal")
+    ap.add_argument("--budget-gib", type=float, help="device memory for all segments; unmapped ones are evicted to fit")
     a = ap.parse_args(argv)
     if not a.file:
         ap.error("register at least one --file")
-    broker = Broker(parse_files(a.file), CudaDevice(a.device), a.allow_uid or None)
+    budget = int(a.budget_gib * (1 << 30)) if a.budget_gib else None
+    broker = Broker(parse_files(a.file), CudaDevice(a.device), a.allow_uid or None, budget)
     print(f"serving {len(broker.files)} segments on {a.socket}", flush=True)
     broker.serve(a.socket, a.mode)
 

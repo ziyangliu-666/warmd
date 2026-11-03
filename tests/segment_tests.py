@@ -43,6 +43,9 @@ class FakeDevice:
         self.loads.append((path, total))
         return len(self.loads), r, S.round_up(max(total, 1), 2 << 20)
 
+    def size_for(self, total):
+        return S.round_up(max(total, 1), 2 << 20)
+
     def release(self, handle, fd):
         os.close(fd)
         self.releases.append(handle)
@@ -197,6 +200,30 @@ class BrokerTests(unittest.TestCase):
         reply, fd = self.b.request(self.me, {"op": "open", "name": "m"})
         self.assertFalse(reply["ok"])
         self.assertIsNone(fd)
+
+    def test_budget_evicts_least_recently_used_unmapped_segment(self):
+        files = {}
+        for n in "abc":
+            files[n] = os.path.join(self.dir, f"{n}.safetensors")
+            write_safetensors(files[n], {"w": ("U8", [8], bytes(8))})
+        b = S.Broker(files, self.dev, budget=2 * (2 << 20))       # room for two segments
+        conns = {n: b.new_connection() for n in "abc"}
+        for n in "ab":
+            b.request(self.me, {"op": "open", "name": n}, conns[n])
+            b.request(self.me, {"op": "release", "name": n}, conns[n])
+        b.request(self.me, {"op": "open", "name": "a"}, conns["a"])    # a is mapped again
+        self.assertTrue(b.request(self.me, {"op": "open", "name": "c"}, conns["c"])[0]["ok"])
+        self.assertEqual(sorted(b.loaded), ["a", "c"])                 # b was idle, so it went
+
+    def test_budget_full_of_mapped_segments_refuses(self):
+        files = {n: os.path.join(self.dir, f"{n}.safetensors") for n in "ab"}
+        for p in files.values():
+            write_safetensors(p, {"w": ("U8", [8], bytes(8))})
+        b = S.Broker(files, self.dev, budget=2 << 20)
+        b.request(self.me, {"op": "open", "name": "a"}, b.new_connection())
+        reply, fd = b.request(self.me, {"op": "open", "name": "b"}, b.new_connection())
+        self.assertEqual((reply["ok"], fd), (False, None))
+        self.assertEqual(sorted(b.loaded), ["a"])
 
     @unittest.skipUnless(hasattr(socket, "SO_PEERCRED"), "SO_PEERCRED is Linux only")
     def test_served_over_a_socket(self):
