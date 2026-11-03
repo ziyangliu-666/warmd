@@ -70,7 +70,8 @@ warmd stays useful for the second and third rows. On the second row, a segment m
 - One real checkpoint and vLLM 0.6.6 work (Result 16), on one small model. Other engines and larger models are not tested.
 - One GPU model, one driver branch, PyTorch only, no multi-GPU models.
 - A second uid works: uid 65534 mapped a root broker's segment, with the same output and 12.08 ms per forward pass. Everything ran in one container, because the rented container cannot create namespaces. A forum report says exported fds do not cross containers, and NVIDIA's documentation ties multi-user isolation to IMEX channels. Neither is tested. This is the largest open risk.
-- Device-memory files under gVisor are untested.
+- Device-memory files under gVisor are untested. Source reading predicts that an fd from outside a sandbox fails in nvproxy without a change (Result 22).
+- The fleet saving is a model: 2.4 to 24 times when memory is the limit, and none when compute is the limit (Result 21).
 
 ## Prior work
 

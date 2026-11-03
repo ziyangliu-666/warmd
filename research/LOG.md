@@ -263,6 +263,44 @@ Qwen2.5-0.5B, vLLM 0.6.6, three prompts, 64 tokens. At park the process unmaps w
 
 Computed: 14.6 times faster to the first result than a real cold start, with 11.6 times less device memory than running. The 503 MiB is the broker's context, which many processes share. Limits: the KV pool's contents are lost, so prefix caching does not survive; the first load used a saved copy of the engine's own weights.
 
+## Result 21: capacity model on real arrivals (computed, `results/h20_fleet.jsonl`, `scripts/fleet_model.py`)
+
+This is a model, not a measurement. Azure Functions days 1 and 2, leaving out the top 1% of functions, keep-alive 5 minutes. Target GPU utilization 70%, 38 GB usable. Dedicated means one GPU per resident model.
+
+| service time per request | model size | dedicated, peak GPUs | segments, peak GPUs | peak saving, day 1 and day 2 |
+|---:|---:|---:|---:|---:|
+| 0.1 s | 1.6 GB | 18664, 19014 | 786, 801 | 23.8, 23.7 times |
+| 0.1 s | 8 GB | 18664, 19014 | 3929, 4003 | 4.8, 4.8 times |
+| 0.1 s | 16 GB | 18664, 19014 | 7859, 8006 | 2.4, 2.4 times |
+| 1 s | 1.6 GB | 18664, 19014 | 2379, 3362 | 7.8, 5.7 times |
+| 1 s | 8 GB | 18664, 19014 | 3929, 4003 | 4.8, 4.8 times |
+| 10 s | any | 18664, 19014 | 23791, 33615 | none: 0.8, 0.6 times |
+
+- The result can go against the claim. At 10 s per request, compute is the limit and sharing saves nothing. The dedicated figure there also ignores queueing, so it is too low. Segments cannot create compute.
+- The saving is the ratio of device memory to model size wherever memory is the limit. The arrival shape sets only how many models are resident.
+- The trace is CPU functions. Real GPU request sizes and rates are unknown, and they decide which row applies.
+
+## Result 22: source reading, predictions for the cross-container test
+
+These are predictions from source, not results. Sources: NVIDIA open kernel modules 615.78.08, while our runs used 570; gVisor at HEAD on 2026-11-03.
+
+- `rmobjexportimport.c` says that another RM client can import an exported handle "even if the source rm client gets destroyed". This agrees with Result 17.
+- Export handles live in one kernel-wide map. The import path in `os.c` checks that the fd is the control device (`nv_get_file_private`, minor number) and that its handle is valid. I found no uid, pid or namespace check in the code I read. I did not read every function it calls.
+- gVisor's `ctrlHasFrontendFD` looks the fd up in the sandbox's own table, and it returns EINVAL unless the file is a `frontendFD`. An fd from outside the sandbox has a different type.
+
+Predictions for `run_h19.sh`, written before any run:
+
+| case | prediction |
+|---|---|
+| A, no containers | pass |
+| B, two containers | pass |
+| C, another uid | pass |
+| D, owner exits after sending | pass |
+| E, no capabilities, read-only root | pass |
+| F, client in gVisor, owner outside | fail with an invalid-value error from nvproxy |
+
+If F fails as predicted, sharing across gVisor sandboxes needs a change in nvproxy. Possession of the fd is the capability, so a broker must control who receives it. The forum report of failure across containers was on CUDA 11.3 and did not reach a cause.
+
 ## Blocked: cross-container test
 
 `scripts/xc.c` and `scripts/run_h19.sh` are written and have not run. They cover two containers, a second uid, an owner that exits, a client with no capabilities, and a client in gVisor with nvproxy. On 2026-11-03 the rental failed with `insufficient_credit`: account credit is 0 and balance is -0.018. A100 instance 58531275 showed `exited` when it was destroyed, which fits the credit running out, but this is not confirmed. All A100 results had been copied before that.
