@@ -22,6 +22,7 @@ UTIL = float(os.environ.get("UTIL", "0.12"))
 Q = "/workspace/qwen15"; SOCK = "/tmp/seg.sock"
 F = os.environ.get("F", "/workspace/qwen15_vllm.safetensors")   # the segment file; /dev/shm avoids a slow disk
 SWAP = float(os.environ.get("SWAP", "4"))                       # vLLM CPU swap space per process, GiB, pinned
+KEEP_CPU = os.environ.get("KEEP_CPU", "1") == "1"   # park drops only the GPU KV pool; the pinned CPU swap space stays
 TOOL = "/workspace/exp/cuda-checkpoint"; ROOT = "/workspace/warmd"
 
 
@@ -63,11 +64,24 @@ def worker(i, mode, conn):
             outs = llm.generate(prompts, params, use_tqdm=False)
             conn.send(("done", time.time(), sum(len(o.outputs[0].token_ids) for o in outs)))
         elif msg[0] == "park":
-            c.park(f"m{i}"); w.cache_engine = None; w.gpu_cache = None
+            c.park(f"m{i}")
+            if KEEP_CPU:
+                for ce in w.cache_engine:
+                    ce.gpu_cache = None
+            else:
+                w.cache_engine = None
+            w.gpu_cache = None
             gc.collect(); torch.cuda.synchronize(); torch.cuda.empty_cache(); conn.send(("parked",))
         elif msg[0] == "resume":
             t0 = time.perf_counter(); reloaded = c.resume(f"m{i}")
-            t1 = time.perf_counter(); w._init_cache_engine(); torch.cuda.synchronize()
+            t1 = time.perf_counter()
+            if KEEP_CPU:
+                for ce in w.cache_engine:
+                    ce.gpu_cache = ce._allocate_kv_cache(ce.num_gpu_blocks, "cuda")
+                w.gpu_cache = [ce.gpu_cache for ce in w.cache_engine]
+            else:
+                w._init_cache_engine()
+            torch.cuda.synchronize()
             conn.send(("resumed", t1 - t0, time.perf_counter() - t1, bool(reloaded)))
         else:
             os._exit(0)
@@ -263,7 +277,7 @@ def main():
                wakes=stats["wakes"], wake_mean_s=round(sum(stats["wake_s"]) / max(1, len(stats["wake_s"])), 3), restores=stats["restores"],
                colds=stats["colds"], cold_mean_s=round(sum(stats["cold_s"]) / max(1, len(stats["cold_s"])), 1),
                setup_used_mib=setup_used, used_mean_mib=round(sum(samples) / max(1, len(samples))), used_max_mib=max(samples or [0]), broker_killed=killed, dead_engines=stats.get("dead", 0),
-               hib_after=HIB_AFTER, swap_gib=SWAP, budget_gib=BUDGET_GIB, reloads=reloads[0],
+               hib_after=HIB_AFTER, swap_gib=SWAP, keep_cpu=KEEP_CPU, budget_gib=BUDGET_GIB, reloads=reloads[0],
                parts={k: dict(n=len(v), mean=round(sum(v) / len(v), 3), p50=round(sorted(v)[len(v) // 2], 3), max=round(max(v), 3)) for k, v in parts.items() if v})
     print(json.dumps(out), flush=True)
     os._exit(0)

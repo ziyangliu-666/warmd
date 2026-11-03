@@ -538,8 +538,30 @@ The parts of a wake, as the mean, with the p50 in brackets:
 
 Spend: two hosts failed before this one and were destroyed. One had a disk that could not write 3 GB in 10 minutes, and the other did not finish an image pull in 80 minutes. Credit went from 7.68 to 7.18, so $0.50 for the round, against the approved cap of $1.5.
 
+## Result 35: keep the host part of the KV pool across a park (measured, `results/h34e/`)
+
+The fix comes from Result 34. At park, the harness now drops only the GPU KV tensors. The pinned CPU swap space stays allocated. At resume, it allocates only the GPU tensors again. vLLM 0.6.6 fills both parts with `torch.zeros`, and the CPU part is 2 GiB of pinned memory. Everything else is the same as in Result 34, on the same host.
+
+| | seg, 2 s, Result 34 | seg, 2 s, kept | seg, 30 s, kept | plain, 7 engines, Result 34 |
+|---|---|---|---|---|
+| tokens per second | 363.7 | 376.2 | 376.2 | 266.2 |
+| latency p50, p90, p99 | 33, 123, 245 s | 15, 69, 101 s | 15, 54, 90 s | 148, 297, 429 s |
+| mean wake | 3.56 s | 0.96 s | 0.56 s | cold start 18.4 s |
+| KV rebuild in a wake | 2.32 s | 0.008 s | 0.006 s | |
+| restore, segment map | 0.98, 0.24 s | 0.71, 0.23 s | 0.69, 0.23 s | |
+| device memory mean | 27.1 GiB | 27.1 GiB | 30.8 GiB | 25.6 GiB |
+
+- The KV rebuild fell from 2.32 s to 8 ms, and the mean wake fell from 3.56 s to 0.96 s. The p50 fell from 33 s to 15 s.
+- Against plain at about equal memory, seg now has a p50 that is 10 times lower and a p99 that is 4.2 times lower.
+- Both seg runs reached the same tokens per second. Every request completed, so this number is the fixed total of tokens divided by the time to drain the trace. It measures how soon the work finishes. It does not measure peak capacity. plain needed 1.41 times as long for the same work.
+- The wake is now a restore of about 0.7 s plus a segment reload of about 0.23 s. The reload happens on almost every wake, because the budget holds exactly as many segments as there are active models. A larger budget removes it at the cost of device memory.
+- The general rule for park: free only device state, and keep host state. Host memory is the cheap resource, and pinned allocation is slow.
+
+Spend: credit went from 7.18 to 6.90, so $0.28. The round total is $0.78, against the approved cap of $1.5. The instance is destroyed.
+
 ## Process lessons
 
+- Time each part of a slow step before you guess. I predicted that the restore dominated the wake. The KV rebuild did, and the fix was four lines.
 - Rent a host that already has the image cached. A host that ran the image before starts in under a minute. A new host can take more than an hour.
 
 - Check the worker state machine before you spend GPU hours. Three of four H34 attempts failed on harness races, not on the system under test.

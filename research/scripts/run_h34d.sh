@@ -15,12 +15,14 @@ cd /workspace/exp; nvidia-smi --query-gpu=name,driver_version,memory.used --form
 [ $(df --output=avail -B1G /dev/shm | tail -1) -gt 8 ] && export F=/dev/shm/qwen15_vllm.safetensors
 export SWAP=2; echo "F=${F:-default} SWAP=$SWAP" | tee -a $R/h34d_env.txt; free -g | head -2 | tee -a $R/h34d_env.txt
 echo setup-done
-for run in "seg 2 6" "seg 30 6" "plain 2 7"; do set -- $run
+RUNS=${RUNS:-"seg 2 6|seg 30 6|plain 2 7"}
+IFS='|' read -ra list <<< "$RUNS"
+for run in "${list[@]}"; do set -- $run
   ps -eo pid,args | grep -E "[w]armd.segments|[s]pawn_main|[p]ython3 h34.py" | awk '{print $1}' | xargs -r kill -9; sleep 5
   rm -f ${F:-/workspace/qwen15_vllm.safetensors}.done
-  n=h34d_$1_$2_$3
+  n=${OUT:-h34d}_$1_$2_$3
   HIB_AFTER=$2 ACTIVE=$3 timeout 2400 python3 h34.py $1 /workspace/exp/h34_trace.json 600 > $R/$n.out 2> $R/$n.err
-  grep "^{" $R/$n.out | tail -1 | tee -a $R/h34d.jsonl
+  grep "^{" $R/$n.out | tail -1 | tee -a $R/${OUT:-h34d}.jsonl
   grep -E "Error|Traceback|had exited" $R/$n.err | tail -n 3 | cut -c1-200
   grep -v -E "preempted|Loading safetensors|^$" $R/$n.err | tail -c 3000 > $R/$n.tail.txt
 done

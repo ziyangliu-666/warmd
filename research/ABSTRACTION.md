@@ -42,7 +42,7 @@ On a real engine, vLLM with Qwen2.5-0.5B, the lowest state holds 503 MiB of shar
 
 On ten real minutes of arrivals, isolated processes on segments reach a p99 of 141 ms, against 147 ms for one unisolated process and 3891 ms for a favoured scale-to-zero simulation (Result 19).
 
-On sixteen vLLM processes of Qwen2.5-1.5B on one A100, with at most six active and KV pools included, park and hibernate serve 1.45 times the tokens of stopping and cold-starting engines. The p99 latency falls from 424 s to 132 s on an overloaded trace. Killing the broker mid-run caused no errors. A wake costs 4.26 s, which is far above the ladder's prediction, and seg used 5 GiB more device memory (Result 33).
+On sixteen vLLM processes of Qwen2.5-1.5B on one A100, with at most six active and KV pools included, park and hibernate serve 1.45 times the tokens of stopping and cold-starting engines. The p99 latency falls from 424 s to 132 s on an overloaded trace. Killing the broker mid-run caused no errors. At about equal device memory, with park keeping the host half of the KV pool, the p50 falls from 148 s to 15 s and the p99 from 429 s to 101 s. A wake is 0.96 s: a cuda-checkpoint restore of 0.7 s and a segment reload of 0.23 s (Results 33 to 35).
 
 Segments cross trust boundaries. Two containers, another uid, a user namespace, no capabilities, and an exited owner all work with the unmodified driver. A gVisor sandbox works with a 9-line nvproxy change, and real kernels there give the same output with fault isolation (Results 23 to 25).
 
@@ -86,7 +86,7 @@ The exact combination did not appear in two searches, which is weak evidence. Cl
 
 ## Next experiments, in order
 
-1. Split the 4.26 s vLLM wake into checkpoint restore, wait for a checkpoint in progress, segment reload and KV pool setup. Then rerun Result 33 at equal device memory. Done so far: the many-model run itself (Result 33), and broker restart with reconnect.
+1. Cut the 0.7 s vLLM restore. It restores the whole process's device state, but after a park only the context and allocator state are left. Measure what it holds, and try a zygote fork in place of the restore. Done so far: the many-model run (Result 33), the wake split and an equal-memory rerun (Result 34), the KV fix (Result 35), and broker restart with reconnect.
 2. Compare with one vLLM process that serves many LoRA adapters on the same trace. This applies only when the models share a base.
 3. Add per-tenant memory accounting, and expose segments to the scheduler.
 4. Support models sharded over several GPUs.
