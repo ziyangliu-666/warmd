@@ -6,7 +6,7 @@ LDFLAGS_EXTRA ?=
 B       := build
 
 .PHONY: all clean install test bench tools
-all: $(B)/warmd $(B)/lib/libcuda.so.1 $(B)/demo $(B)/driver_features $(B)/driver_features_native
+all: $(B)/warmd $(B)/lib/libcuda.so.1 $(B)/lib/libwarmd_segment.so $(B)/demo $(B)/driver_features $(B)/driver_features_native
 
 $(B)/warmd: src/warmd.c src/worker.c src/common.h src/proto.h
 	@mkdir -p $(B)
@@ -17,6 +17,11 @@ $(B)/lib/libcuda.so.1: src/shim.c src/shim_dark.c src/shim_stubs.c src/shim.map 
 	@mkdir -p $(B)/lib
 	$(CC) $(CFLAGS) -fPIC -shared src/shim.c src/shim_stubs.c -o $@ -Wl,--version-script=src/shim.map -Wl,-soname,libcuda.so.1 -lpthread -ldl
 	ln -sf libcuda.so.1 $(B)/lib/libcuda.so
+
+# segments: read-only device memory shared between processes (python/warmd/segments.py)
+$(B)/lib/libwarmd_segment.so: src/segment.c
+	@mkdir -p $(B)/lib
+	$(CC) $(CFLAGS) -fPIC -shared $< -o $@ -I$(CUDA)/include $(LDFLAGS_EXTRA) -lcuda
 
 # a driver-API program linked against the shim (used by tests)
 $(B)/demo: tests/demo.c $(B)/lib/libcuda.so.1
@@ -38,6 +43,7 @@ install: all
 	install -D -m 755 $(B)/warmd $(DESTDIR)$(PREFIX)/bin/warmd
 	install -D -m 755 $(B)/lib/libcuda.so.1 $(DESTDIR)$(PREFIX)/lib/warmd/libcuda.so.1
 	ln -sf libcuda.so.1 $(DESTDIR)$(PREFIX)/lib/warmd/libcuda.so
+	install -D -m 755 $(B)/lib/libwarmd_segment.so $(DESTDIR)$(PREFIX)/lib/libwarmd_segment.so
 
 test: all
 	tests/run.sh
