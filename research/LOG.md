@@ -348,7 +348,7 @@ Failure kept for the record: the first fault test reported "faulted", but the me
 
 Not tested in gVisor: hibernation with cuda-checkpoint, park and evict under load, and vLLM.
 
-Spend: the VM ran about 1.2 hours at about $0.09 per hour.
+Spend: the VM ran 0.41 hours at about $0.09 per hour, about $0.04 by estimate. Account credit went from 9.98 to 9.95.
 
 ## Process lessons
 
