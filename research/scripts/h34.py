@@ -38,7 +38,7 @@ def worker(i, mode, conn):
         names = dict(m.named_parameters(remove_duplicate=False)); first, alias = {}, {}
         for k, p in names.items():
             alias[k] = first.setdefault(id(p), k)
-        if i == 0 and not os.path.exists(F + ".done"):
+        if not os.path.exists(F + ".done"):     # setup starts models one at a time, so the first one writes it
             from safetensors.torch import save_file
             save_file({k: names[k].detach().cpu().clone() for k in first.values()}, F)
             open(F + ".done", "w").close()
@@ -117,7 +117,9 @@ def main():
 
     if mode == "seg":
         broker = start_broker()
-        for i in range(N):                      # start one at a time: vLLM sizes its pool from free memory
+        # Start one at a time: vLLM sizes its pool from free memory. Start the idle models first,
+        # so their segments are unmapped and the budget can evict them for the active ones.
+        for i in reversed(range(N)):
             spawn(i)
             if i >= ACTIVE:
                 call(i, "park"); toggle(i); state[i] = "hib"
@@ -132,6 +134,8 @@ def main():
         """Called with cond held. Returns with model i active and busy."""
         held = False                       # plain: this thread holds cold_lock
         while True:
+            if busy[i]:                    # another thread is parking or stopping this model
+                cond.wait(); continue
             if state[i] == "active":
                 busy[i] = True
                 return
@@ -149,7 +153,11 @@ def main():
                 else:
                     if not held:
                         cold_lock.acquire(); held = True
-                    pipes[v].send(("stop",)); procs[v].join(60)
+                    if procs[v].is_alive():
+                        pipes[v].send(("stop",)); procs[v].join(60)
+                    else:
+                        print(f"engine {v} had exited with code {procs[v].exitcode}", file=sys.stderr, flush=True)
+                        stats["dead"] = stats.get("dead", 0) + 1
                     if procs[v].is_alive():
                         procs[v].kill(); procs[v].join()
             finally:
@@ -242,7 +250,7 @@ def main():
                tokens_per_s=round(stats["tokens"] / wall, 1), p50_s=pct(.5), p90_s=pct(.9), p99_s=pct(.99), max_s=pct(1.0),
                wakes=stats["wakes"], wake_mean_s=round(sum(stats["wake_s"]) / max(1, len(stats["wake_s"])), 3), restores=stats["restores"],
                colds=stats["colds"], cold_mean_s=round(sum(stats["cold_s"]) / max(1, len(stats["cold_s"])), 1),
-               setup_used_mib=setup_used, used_mean_mib=round(sum(samples) / max(1, len(samples))), used_max_mib=max(samples or [0]), broker_killed=killed)
+               setup_used_mib=setup_used, used_mean_mib=round(sum(samples) / max(1, len(samples))), used_max_mib=max(samples or [0]), broker_killed=killed, dead_engines=stats.get("dead", 0))
     print(json.dumps(out), flush=True)
     os._exit(0)
 

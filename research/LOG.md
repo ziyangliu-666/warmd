@@ -473,7 +473,41 @@ RTX 3060 VM, driver 570.195.03, both versions built from the same gVisor commit.
 
 Spend for this VM: 0.23 hours, about $0.02. Account credit is 9.74 after both validation runs, against the approved cap of $3.
 
+## Result 33: sixteen vLLM models on one A100 (measured, `results/h34/`)
+
+Setup:
+- Hardware and software: an A100 40 GB, vLLM 0.6.6, and Qwen2.5-1.5B-Instruct in bf16. The weights are 2.89 GiB.
+- Models: 16 copies of the model, each with its own segment name.
+- Trace: Azure conversation lengths, with Zipf popularity across the 16 models. It has 1481 requests in 600 s.
+- Limits: at most 6 models are active at a time. Each model has the same KV pool, `gpu_memory_utilization` 0.12.
+- `plain`: a request for an inactive model stops the least recently used idle engine and cold-starts a new one. One engine changes at a time.
+- `seg`: all 16 processes stay alive. An idle model parks: its weights are unmapped and its KV pool is dropped. After 2 s it is checkpointed with cuda-checkpoint. The broker budget is 18 GiB, which holds six resident segments.
+
+| | plain | seg | seg, broker killed at 150 s |
+|---|---|---|---|
+| requests completed, errors | 1481, 0 | 1481, 0 | 745 of 745, 0 |
+| tokens per second | 251.3 | 363.2 | 343.9 |
+| latency p50, p90, p99 | 171, 306, 424 s | 30, 105, 132 s | 31, 79, 108 s |
+| model switches | 40 cold starts, mean 20.0 s | 89 wakes, mean 4.26 s | 49 wakes, mean 4.74 s |
+| device memory mean, max | 22.0, 24.6 GiB | 27.1, 29.3 GiB | 28.2, 31.6 GiB |
+
+- With the same limit on active models, seg serves 1.45 times the tokens. Its p50 is 5.6 times lower and its p99 is 3.2 times lower.
+- Both modes are overloaded, so most of the latency is queueing. The KV pool holds only about 8000 tokens per model, and vLLM preempted requests in both modes. The ratio matters more than the absolute latency.
+- seg used 5 GiB more device memory on average. Each parked process that is not yet checkpointed keeps its context, and the broker keeps its own context. The comparison is therefore not at equal memory. With six more resident segments in the 5 GiB, plain could keep about one more engine.
+- A wake costs 4.26 s, not milliseconds. The ladder predicted about 0.25 s for a restore plus milliseconds for a remap. I did not measure the parts. The candidates are the cuda-checkpoint restore of a vLLM process, a wake that waits for a checkpoint still in progress, and a segment reload after an eviction. This is the next thing to measure: if the wake falls to under 1 s, seg gains much more.
+- Killing the broker at 150 s caused no errors and no failed requests. Mapped segments stayed valid, and later opens went to the new broker.
+
+Four harness bugs made the first three attempts invalid. Each one is fixed in `scripts/h34.py`:
+- The broker's budget check did not count a load in progress. Two loads at the same time both passed, and the broker went past its budget. This was a real bug in `segments.py`. It is fixed, and a test covers it.
+- Two vLLM cold starts at the same time sized their KV pools from each other's free memory, and they failed.
+- At setup, the six active models filled the budget, so the seventh model could not open its segment.
+- A model that another thread was parking or stopping could still take a request. Two threads then used one pipe.
+
+Spend: the A100 at $0.337 per hour, about 4.3 hours, about $1.45.
+
 ## Process lessons
+
+- Check the worker state machine before you spend GPU hours. Three of four H34 attempts failed on harness races, not on the system under test.
 
 - Add the obvious control before crediting a new tool: persistence mode explained most of the MPS start-up gain.
 - A prediction from reading part of a code base is weak. cuda-checkpoint in gVisor was predicted to fail and worked.
