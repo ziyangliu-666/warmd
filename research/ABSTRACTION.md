@@ -84,9 +84,13 @@ The exact combination did not appear in two searches, which is weak evidence. Cl
 
 ## Next experiments, in order
 
-2. Measure real batched token rates, and add KV memory to the fleet model. Find a trace that links many GPU models to their arrivals.
-3. Turn the vLLM result into a supported interface, and test a larger model with requests in flight.
-4. Offer version 2 of the nvproxy change to gVisor.
+1. Run more models than fit on one A100, with batched serving and KV memory included, and a simple park and evict policy. Compare tokens per second and p99 with vLLM serving many models or LoRA adapters on the same trace. Kill the broker once during the run.
+2. Make the broker survive a restart: keep its table on disk and adopt segments that clients still map.
+3. Add per-tenant memory accounting, and expose segments to the scheduler.
+4. Support models sharded over several GPUs.
+5. Offer the nvproxy change to gVisor.
+
+An independent review on 2026-11-03 named these gaps. It also found three code problems, now fixed: a reload while clients still mapped the old copy, a stale host copy after the file changed, and one lock for all loads.
 
 ## Reproduce
 

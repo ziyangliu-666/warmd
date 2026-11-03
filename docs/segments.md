@@ -25,7 +25,7 @@ model.load_state_dict(weights, assign=True)
 
 `c.park("llama")` unmaps the segment and frees the process's scratch memory. The tensors keep their addresses. `c.resume("llama")` maps the segment again at the same addresses, so the model needs no rebuild and no warm-up.
 
-If the broker evicted the segment, `resume` waits while the broker loads it again.
+If the broker evicted the segment, `resume` waits while the broker loads it again, and returns True. If the file changed, the tensors then hold the new weights. If its layout changed, `resume` fails.
 
 | step, 1.6 GB model, A100 | time |
 |---|---:|
@@ -45,7 +45,7 @@ To free the context's device memory too (about 500 MiB for a PyTorch process on 
 ## Limits
 
 - Weights must not change. Training needs ordinary memory.
-- Eviction frees memory only after every client has parked. A client that does not park keeps the memory until it exits.
+- The broker refuses to evict a segment while any client maps it, because a later load would hold a second copy. `evict(force=True)` overrides this. A client that exits releases its mappings.
 - The first load copies the file into pinned host memory, which stays allocated for later reloads.
 
 Measurements and the experiments behind them are in `research/`.

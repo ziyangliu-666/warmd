@@ -35,6 +35,26 @@ def client_sum(sock, q):
     q.put((a, float((t["w"] @ t["w"]).sum())))
 
 
+def client_evict(sock, q):
+    from warmd.segments import Client
+    c = Client(sock)
+    t = c.open("m")
+    a = float((t["w"] @ t["w"]).sum())
+    refused = not _try_evict(c)
+    c.park("m")
+    evicted = c.evict("m")
+    reloaded = c.resume("m")
+    q.put((refused, evicted, reloaded, a == float((t["w"] @ t["w"]).sum())))
+
+
+def _try_evict(c):
+    from warmd.segments import SegmentError
+    try:
+        return c.evict("m")
+    except SegmentError:
+        return False
+
+
 def client_write(sock, q):
     import torch
     from warmd.segments import Client
@@ -78,6 +98,9 @@ class SegmentGpuTests(unittest.TestCase):
         a1, b1 = self.run_child(client_sum)
         a2, _ = self.run_child(client_sum)
         self.assertEqual((a1, a1), (b1, a2))
+
+    def test_evict_is_refused_while_mapped_and_resume_reloads(self):
+        self.assertEqual(self.run_child(client_evict), (True, True, True, True))
 
     def test_a_store_faults_the_writer_and_not_the_next_client(self):
         self.assertEqual(self.run_child(client_write), "faulted")

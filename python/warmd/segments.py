@@ -141,7 +141,7 @@ class CudaDevice:
         self.ordinal = ordinal
         self.cuda = ctypes.CDLL("libcuda.so.1")
         self.lib = _library()
-        self.host = {}          # path -> (pinned address, size); weights are copied from here
+        self.host = {}          # path -> (file identity, pinned address, size); weights are copied from here
         self.lock = threading.Lock()
         self.granularity = None
 
@@ -158,10 +158,15 @@ class CudaDevice:
             self.granularity = max(g.value, 2 << 20)
 
     def _host_image(self, path, layout, total):
-        """Copy the file once into pinned host memory, in segment layout."""
+        """Copy the file into pinned host memory, in segment layout. Copy again if the file changed."""
+        st = os.stat(path)
+        identity = (st.st_size, st.st_mtime_ns, st.st_ino)
         with self.lock:
-            if path in self.host:
-                return self.host[path]
+            old = self.host.get(path)
+            if old and old[0] == identity:
+                return old[1], old[2]
+            if old:
+                self.lib.seg_host_free(ctypes.c_void_p(old[1]))
             p = ctypes.c_void_p()
             _check(self.lib.seg_host_alloc(ctypes.byref(p), ctypes.c_size_t(max(total, 1))), "host alloc")
             with open(path, "rb") as f:
@@ -169,8 +174,8 @@ class CudaDevice:
                     f.seek(t["source"])
                     data = f.read(t["nbytes"])
                     ctypes.memmove(p.value + t["offset"], data, len(data))
-            self.host[path] = (p.value, total)
-            return self.host[path]
+            self.host[path] = (identity, p.value, total)
+            return p.value, total
 
     def load(self, path, layout, total):
         """Create device memory, fill it, and return (handle, fd, size)."""
@@ -213,21 +218,39 @@ class Broker:
         self.admin = {me, 0}
         self.loaded = {}         # name -> dict(handle, fd, size, layout, generation)
         self.generation = {}
-        self.lock = threading.Lock()
+        self.mapped = {}         # name -> number of clients that map the loaded generation
+        self.lock = threading.Lock()                          # guards the dicts only
+        self.load_locks = {n: threading.Lock() for n in self.files}   # a slow load blocks its own name only
 
-    def request(self, uid, req):
-        """Handle one request. Return (reply, fd or None). Raises nothing for client errors."""
+    def new_connection(self):
+        return {}                # name -> times this connection mapped the loaded generation
+
+    def end_connection(self, conn):
+        with self.lock:
+            for name, n in conn.items():
+                if name in self.mapped:
+                    self.mapped[name] = max(0, self.mapped[name] - n)
+            conn.clear()
+
+    def request(self, uid, req, conn=None):
+        """Handle one request. Return (reply, fd or None). Client errors become replies.
+
+        conn is the per-connection state from new_connection(). It counts mappings, so that
+        evict can refuse while a client still maps a segment: a reload then would hold two copies.
+        """
+        conn = {} if conn is None else conn
         op, name = req.get("op"), req.get("name")
         if uid not in self.allow:
             return dict(ok=False, error="permission denied"), None
         if op == "list":
             with self.lock:
-                return dict(ok=True, segments={n: n in self.loaded for n in self.files}), None
+                return dict(ok=True, segments={n: dict(loaded=n in self.loaded, mapped=self.mapped.get(n, 0)) for n in self.files}), None
         if not isinstance(name, str) or name not in self.files:
             return dict(ok=False, error="unknown segment"), None
         if op == "open":
-            with self.lock:
-                s = self.loaded.get(name)
+            with self.load_locks[name]:
+                with self.lock:
+                    s = self.loaded.get(name)
                 if s is None:
                     try:
                         start, header = read_header(self.files[name])
@@ -235,15 +258,30 @@ class Broker:
                         handle, fd, size = self.device.load(self.files[name], layout, total)
                     except (OSError, ValueError, SegmentError) as e:
                         return dict(ok=False, error=f"load failed: {e}"), None
-                    self.generation[name] = self.generation.get(name, 0) + 1
-                    s = self.loaded[name] = dict(handle=handle, fd=fd, size=size, layout=layout, generation=self.generation[name])
+                    with self.lock:
+                        self.generation[name] = self.generation.get(name, 0) + 1
+                        s = self.loaded[name] = dict(handle=handle, fd=fd, size=size, layout=layout, generation=self.generation[name])
+                        self.mapped[name] = 0
+                with self.lock:
+                    self.mapped[name] += 1
+                    conn[name] = conn.get(name, 0) + 1
                 public = {k: {f: v[f] for f in ("dtype", "shape", "offset", "nbytes")} for k, v in s["layout"].items()}
                 return dict(ok=True, size=s["size"], layout=public, generation=s["generation"]), s["fd"]
+        if op == "release":
+            with self.lock:
+                if conn.get(name, 0) > 0:
+                    conn[name] -= 1
+                    self.mapped[name] = max(0, self.mapped.get(name, 0) - 1)
+            return dict(ok=True), None
         if op == "evict":
             if uid not in self.admin:
                 return dict(ok=False, error="permission denied"), None
-            with self.lock:
+            with self.load_locks[name], self.lock:
+                users = self.mapped.get(name, 0)
+                if users and not req.get("force"):
+                    return dict(ok=False, error=f"{users} clients still map {name}; park them first or pass force"), None
                 s = self.loaded.pop(name, None)
+                self.mapped.pop(name, None)
                 if s is not None:
                     self.device.release(s["handle"], s["fd"])
             return dict(ok=True, evicted=s is not None), None
@@ -254,13 +292,16 @@ class Broker:
             creds = conn.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, struct.calcsize("3i"))
             _, uid, _ = struct.unpack("3i", creds)
             self.device.bind()
-            buffer = bytearray()
-            while True:
-                req, stray = recv_message(conn, buffer)
-                if stray is not None:
-                    os.close(stray)
-                reply, fd = self.request(uid, req if isinstance(req, dict) else {})
-                send_message(conn, reply, fd)
+            buffer, state = bytearray(), self.new_connection()
+            try:
+                while True:
+                    req, stray = recv_message(conn, buffer)
+                    if stray is not None:
+                        os.close(stray)
+                    reply, fd = self.request(uid, req if isinstance(req, dict) else {}, state)
+                    send_message(conn, reply, fd)
+            finally:
+                self.end_connection(state)    # a client that exits maps nothing
         except (EOFError, ConnectionError, json.JSONDecodeError, SegmentError):
             pass
         finally:
@@ -359,7 +400,7 @@ class Client:
         if name in self.maps:
             raise SegmentError(f"{name} is already open")
         reply, va, h = self._attach(name)
-        self.maps[name] = dict(va=va, size=reply["size"], handle=h, mapped=True)
+        self.maps[name] = dict(va=va, size=reply["size"], handle=h, mapped=True, generation=reply["generation"], layout=reply["layout"])
         return {k: tensor_at(va + t["offset"], t["shape"], t["dtype"], self.device_index) for k, t in reply["layout"].items()}
 
     def park(self, name):
@@ -372,17 +413,33 @@ class Client:
         _check(self.lib.seg_unmap(ctypes.c_uint64(m["va"]), ctypes.c_size_t(m["size"])), "unmap")
         _check(self.lib.seg_release(ctypes.c_uint64(m["handle"])), "release")
         m["mapped"] = False
+        self._call(op="release", name=name)
         torch.cuda.empty_cache()     # scratch memory is the only mutable device state left
 
     def resume(self, name):
-        """Map a parked segment again at the same address. The broker reloads it if it was evicted."""
+        """Map a parked segment again at the same address. The broker reloads it if it was evicted.
+
+        Return True if the broker loaded a new generation, for example after the file changed.
+        The tensors then hold the new weights. If the layout changed, resume fails and leaves the
+        segment parked, because the tensors would point at the wrong bytes.
+        """
         m = self.maps[name]
         if m["mapped"]:
-            return
-        reply, _, h = self._attach(name, m["va"])
-        if reply["size"] != m["size"]:
-            raise SegmentError(f"{name} changed size")
-        m["handle"], m["mapped"] = h, True
+            return False
+        reply, fd = self._call(op="open", name=name)
+        if reply["size"] != m["size"] or reply["layout"] != m["layout"]:
+            os.close(fd)
+            self._call(op="release", name=name)
+            raise SegmentError(f"{name} changed layout; open it again")
+        h = ctypes.c_uint64()
+        try:
+            _check(self.lib.seg_import(fd, ctypes.byref(h)), "import")
+        finally:
+            os.close(fd)
+        _check(self.lib.seg_map(ctypes.c_uint64(m["va"]), ctypes.c_size_t(m["size"]), h, 1), "map")
+        changed = reply["generation"] != m["generation"]
+        m["handle"], m["mapped"], m["generation"] = h.value, True, reply["generation"]
+        return changed
 
     def close(self, name):
         self.park(name)
@@ -392,9 +449,10 @@ class Client:
     def list(self):
         return self._call(op="list")[0]["segments"]
 
-    def evict(self, name):
-        """Ask the broker to drop its reference. Needs the broker's uid or root."""
-        return self._call(op="evict", name=name)[0]["evicted"]
+    def evict(self, name, force=False):
+        """Ask the broker to drop its copy. Needs the broker's uid or root. Refused while any
+        client maps the segment, unless force: then mapped clients keep the old copy alive."""
+        return self._call(op="evict", name=name, force=force)[0]["evicted"]
 
 
 def main(argv=None):

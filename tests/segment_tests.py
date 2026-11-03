@@ -156,15 +156,40 @@ class BrokerTests(unittest.TestCase):
         self.assertEqual(self.dev.loads, [])
 
     def test_only_admin_evicts(self):
-        self.b.request(self.me, {"op": "open", "name": "m"})
+        c = self.b.new_connection()
+        self.b.request(self.me, {"op": "open", "name": "m"}, c)
+        self.b.request(self.me, {"op": "release", "name": "m"}, c)
         self.assertFalse(self.b.request(4242, {"op": "evict", "name": "m"})[0]["ok"])
         self.assertTrue(self.b.request(self.me, {"op": "evict", "name": "m"})[0]["evicted"])
         self.assertEqual(self.dev.releases, [1])
 
+    def test_evict_waits_for_every_client_to_release(self):
+        # A reload while a client still maps the old copy would hold two copies on the device.
+        c1, c2 = self.b.new_connection(), self.b.new_connection()
+        self.b.request(self.me, {"op": "open", "name": "m"}, c1)
+        self.b.request(4242, {"op": "open", "name": "m"}, c2)
+        self.assertFalse(self.b.request(self.me, {"op": "evict", "name": "m"})[0]["ok"])
+        self.b.request(self.me, {"op": "release", "name": "m"}, c1)
+        self.assertFalse(self.b.request(self.me, {"op": "evict", "name": "m"})[0]["ok"])
+        self.b.end_connection(c2)          # a client that exits releases its mappings
+        self.assertTrue(self.b.request(self.me, {"op": "evict", "name": "m"})[0]["evicted"])
+
+    def test_release_without_open_changes_nothing(self):
+        c1, c2 = self.b.new_connection(), self.b.new_connection()
+        self.b.request(self.me, {"op": "open", "name": "m"}, c1)
+        self.b.request(self.me, {"op": "release", "name": "m"}, c2)
+        self.assertFalse(self.b.request(self.me, {"op": "evict", "name": "m"})[0]["ok"])
+
+    def test_force_evict(self):
+        self.b.request(self.me, {"op": "open", "name": "m"}, self.b.new_connection())
+        self.assertTrue(self.b.request(self.me, {"op": "evict", "name": "m", "force": True})[0]["evicted"])
+
     def test_open_after_evict_reloads_with_new_generation(self):
-        g1 = self.b.request(self.me, {"op": "open", "name": "m"})[0]["generation"]
+        c = self.b.new_connection()
+        g1 = self.b.request(self.me, {"op": "open", "name": "m"}, c)[0]["generation"]
+        self.b.request(self.me, {"op": "release", "name": "m"}, c)
         self.b.request(self.me, {"op": "evict", "name": "m"})
-        g2 = self.b.request(self.me, {"op": "open", "name": "m"})[0]["generation"]
+        g2 = self.b.request(self.me, {"op": "open", "name": "m"}, c)[0]["generation"]
         self.assertEqual((g1, g2, len(self.dev.loads)), (1, 2, 2))
 
     def test_broken_file_is_an_error_not_a_crash(self):
@@ -189,7 +214,7 @@ class BrokerTests(unittest.TestCase):
         self.assertTrue(reply["ok"])
         self.assertIsNotNone(fd)
         S.send_message(c, {"op": "list"})
-        self.assertEqual(S.recv_message(c, buf)[0]["segments"], {"m": True})
+        self.assertEqual(S.recv_message(c, buf)[0]["segments"], {"m": {"loaded": True, "mapped": 1}})
         os.close(fd)
         c.close()
 
