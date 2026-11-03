@@ -503,7 +503,7 @@ Four harness bugs made the first three attempts invalid. Each one is fixed in `s
 - At setup, the six active models filled the budget, so the seventh model could not open its segment.
 - A model that another thread was parking or stopping could still take a request. Two threads then used one pipe.
 
-Spend: the A100 at $0.337 per hour, about 4.3 hours, about $1.45.
+Spend: the A100 at $0.337 per hour. Credit went from 9.73 to 7.68, so $2.05 for this round with the GPU tests and setup, against the approved cap of $3. The instance is destroyed.
 
 ## Process lessons
 
