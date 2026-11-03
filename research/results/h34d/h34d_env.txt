@@ -1,0 +1,4 @@
+NVIDIA A100-PCIE-40GB, 595.91.07, 0 MiB
+F=/dev/shm/qwen15_vllm.safetensors SWAP=2
+               total        used        free      shared  buff/cache   available
+Mem:            1007          21         456           0         529         977

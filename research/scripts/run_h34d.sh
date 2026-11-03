@@ -11,10 +11,13 @@ python3 -c 'from huggingface_hub import snapshot_download as s; print(s("Qwen/Qw
 cd /workspace/warmd && make -s build/lib/libwarmd_segment.so && python3 tests/segment_tests.py 2>&1 | tail -1
 curl -sSL -m 60 -o /workspace/exp/cuda-checkpoint https://github.com/NVIDIA/cuda-checkpoint/raw/main/bin/x86_64_Linux/cuda-checkpoint; chmod +x /workspace/exp/cuda-checkpoint
 cd /workspace/exp; nvidia-smi --query-gpu=name,driver_version,memory.used --format=csv,noheader | tee $R/h34d_env.txt
+# The segment file goes to /dev/shm when it has room: one host had a disk too slow to write 3 GB in 10 minutes.
+[ $(df --output=avail -B1G /dev/shm | tail -1) -gt 8 ] && export F=/dev/shm/qwen15_vllm.safetensors
+export SWAP=2; echo "F=${F:-default} SWAP=$SWAP" | tee -a $R/h34d_env.txt; free -g | head -2 | tee -a $R/h34d_env.txt
 echo setup-done
 for run in "seg 2 6" "seg 30 6" "plain 2 7"; do set -- $run
   ps -eo pid,args | grep -E "[w]armd.segments|[s]pawn_main|[p]ython3 h34.py" | awk '{print $1}' | xargs -r kill -9; sleep 5
-  rm -f /workspace/qwen15_vllm.safetensors.done
+  rm -f ${F:-/workspace/qwen15_vllm.safetensors}.done
   n=h34d_$1_$2_$3
   HIB_AFTER=$2 ACTIVE=$3 timeout 2400 python3 h34.py $1 /workspace/exp/h34_trace.json 600 > $R/$n.out 2> $R/$n.err
   grep "^{" $R/$n.out | tail -1 | tee -a $R/h34d.jsonl

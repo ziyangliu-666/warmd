@@ -19,7 +19,9 @@ HIB_AFTER = float(os.environ.get("HIB_AFTER", "2"))
 KILL_AT = float(os.environ.get("KILL_AT", "1e9"))     # kill and restart the broker at this second
 BUDGET_GIB = os.environ.get("BUDGET_GIB", "18")   # six resident segments: about the memory of six plain engines
 UTIL = float(os.environ.get("UTIL", "0.12"))
-Q = "/workspace/qwen15"; F = "/workspace/qwen15_vllm.safetensors"; SOCK = "/tmp/seg.sock"
+Q = "/workspace/qwen15"; SOCK = "/tmp/seg.sock"
+F = os.environ.get("F", "/workspace/qwen15_vllm.safetensors")   # the segment file; /dev/shm avoids a slow disk
+SWAP = float(os.environ.get("SWAP", "4"))                       # vLLM CPU swap space per process, GiB, pinned
 TOOL = "/workspace/exp/cuda-checkpoint"; ROOT = "/workspace/warmd"
 
 
@@ -28,7 +30,7 @@ def worker(i, mode, conn):
     import torch
     from vllm import LLM, SamplingParams
     t0 = time.perf_counter()
-    llm = LLM(model=Q, gpu_memory_utilization=UTIL, enforce_eager=True, max_model_len=2048, seed=0, dtype="bfloat16", disable_log_stats=True)
+    llm = LLM(model=Q, gpu_memory_utilization=UTIL, enforce_eager=True, max_model_len=2048, seed=0, dtype="bfloat16", disable_log_stats=True, swap_space=SWAP)
     w = llm.llm_engine.model_executor.driver_worker
     c = None
     if mode == "seg":
@@ -261,7 +263,7 @@ def main():
                wakes=stats["wakes"], wake_mean_s=round(sum(stats["wake_s"]) / max(1, len(stats["wake_s"])), 3), restores=stats["restores"],
                colds=stats["colds"], cold_mean_s=round(sum(stats["cold_s"]) / max(1, len(stats["cold_s"])), 1),
                setup_used_mib=setup_used, used_mean_mib=round(sum(samples) / max(1, len(samples))), used_max_mib=max(samples or [0]), broker_killed=killed, dead_engines=stats.get("dead", 0),
-               hib_after=HIB_AFTER, budget_gib=BUDGET_GIB, reloads=reloads[0],
+               hib_after=HIB_AFTER, swap_gib=SWAP, budget_gib=BUDGET_GIB, reloads=reloads[0],
                parts={k: dict(n=len(v), mean=round(sum(v) / len(v), 3), p50=round(sorted(v)[len(v) // 2], 3), max=round(max(v), 3)) for k, v in parts.items() if v})
     print(json.dumps(out), flush=True)
     os._exit(0)

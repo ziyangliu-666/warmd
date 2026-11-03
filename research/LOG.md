@@ -505,7 +505,42 @@ Four harness bugs made the first three attempts invalid. Each one is fixed in `s
 
 Spend: the A100 at $0.337 per hour. Credit went from 9.73 to 7.68, so $2.05 for this round with the GPU tests and setup, against the approved cap of $3. The instance is destroyed.
 
+## Result 34: what a vLLM wake costs, and seg against plain at about equal memory (measured, `results/h34d/`)
+
+The setup is the same as in Result 33, on the same host. Two settings changed for all three runs:
+- The CPU swap space per vLLM process is 2 GiB, not 4. With 4 GiB, 16 processes pin 64 GiB of host memory.
+- The segment file is in `/dev/shm`.
+
+| | seg, hibernate after 2 s | seg, hibernate after 30 s | plain, 7 engines |
+|---|---|---|---|
+| tokens per second | 363.7 | 362.2 | 266.2 |
+| latency p50, p90, p99 | 33, 123, 245 s | 29, 95, 126 s | 148, 297, 429 s |
+| device memory mean, max | 27.1, 29.3 GiB | 30.6, 32.7 GiB | 25.6, 29.8 GiB |
+| switches | 91 wakes, 91 restores | 97 wakes, 64 restores | 43 cold starts, mean 18.4 s |
+
+The parts of a wake, as the mean, with the p50 in brackets:
+
+| part | hibernate after 2 s | hibernate after 30 s |
+|---|---|---|
+| wait for a checkpoint in progress | 0.02 s (0.00) | 0.01 s (0.00) |
+| cuda-checkpoint restore | 0.98 s (0.61) | 1.05 s (0.65) |
+| map the segment, with a reload from pinned host memory | 0.24 s (0.22) | 0.24 s (0.22) |
+| rebuild the KV pool | 2.32 s (2.17) | 2.22 s (2.05) |
+| whole wake | 3.56 s | 3.17 s |
+| checkpoint, off the request path | 2.41 s (1.66) | 1.51 s (0.86) |
+
+- Most of the wake is the KV pool rebuild. At park, the harness drops the whole vLLM cache engine. A resume then allocates the 2 GiB pinned CPU swap space again, as well as the 0.15 GiB GPU pool. The likely fix is to keep the CPU part and reallocate only the GPU part. If that works, the wake falls to about 1.2 s.
+- Every wake reloaded its segment: 91 of 91. The budget holds six segments and six models are active, so a parked segment is always evicted. A reload costs only 0.24 s for 2.89 GiB, so the budget matters less than the KV rebuild.
+- A restore costs 0.98 s, not the 0.24 s of the ladder. A vLLM process holds more device state than the test processes did.
+- At about equal memory, seg still serves 1.37 times the tokens of plain: plain with 7 engines used 25.6 GiB, and seg used 27.1 GiB. One more plain engine raised throughput from 251 to 266 tokens per second, and p99 did not change.
+- If idle models stay parked for 30 s before hibernation, a third of the wakes skip the restore. p99 drops from 245 to 126 s, and device memory rises by 3.5 GiB.
+- The same seg configuration had a p99 of 132 s in Result 33 and 245 s here. Throughput agreed within 0.2%. The tail of an overloaded queue varies from run to run. Compare throughput and p50 across runs, and treat a single p99 with care.
+
+Spend: two hosts failed before this one and were destroyed. One had a disk that could not write 3 GB in 10 minutes, and the other did not finish an image pull in 80 minutes. Credit went from 7.68 to 7.18, so $0.50 for the round, against the approved cap of $1.5.
+
 ## Process lessons
+
+- Rent a host that already has the image cached. A host that ran the image before starts in under a minute. A new host can take more than an hour.
 
 - Check the worker state machine before you spend GPU hours. Three of four H34 attempts failed on harness races, not on the system under test.
 
