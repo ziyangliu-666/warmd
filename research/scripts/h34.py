@@ -17,7 +17,7 @@ import multiprocessing as mp
 N, ACTIVE = 16, 6
 HIB_AFTER = float(os.environ.get("HIB_AFTER", "2"))
 KILL_AT = float(os.environ.get("KILL_AT", "1e9"))     # kill and restart the broker at this second
-BUDGET_GIB = os.environ.get("BUDGET_GIB", "24")
+BUDGET_GIB = os.environ.get("BUDGET_GIB", "18")   # six resident segments: about the memory of six plain engines
 UTIL = float(os.environ.get("UTIL", "0.12"))
 Q = "/workspace/qwen15"; F = "/workspace/qwen15_vllm.safetensors"; SOCK = "/tmp/seg.sock"
 TOOL = "/workspace/exp/cuda-checkpoint"; ROOT = "/workspace/warmd"
@@ -82,6 +82,7 @@ def main():
     busy, last = [False] * N, [0.0] * N
     hib_threads = {}
     cond = threading.Condition()
+    cold_lock = threading.Lock()   # plain: vLLM sizes its pool from free memory, so one engine changes at a time
     stats = dict(wakes=0, wake_s=[], colds=0, cold_s=[], restores=0, errors=0, tokens=0)
     broker = None
 
@@ -106,7 +107,9 @@ def main():
         return msg[1]
 
     def toggle(i):
-        subprocess.run([TOOL, "--toggle", "--pid", str(procs[i].pid)], check=True, capture_output=True)
+        r = subprocess.run([TOOL, "--toggle", "--pid", str(procs[i].pid)], capture_output=True, text=True)
+        if r.returncode:
+            raise RuntimeError(f"cuda-checkpoint on model {i}: {r.stdout} {r.stderr}")
 
     def call(i, *msg):
         pipes[i].send(msg)
@@ -127,11 +130,12 @@ def main():
 
     def make_active(i):
         """Called with cond held. Returns with model i active and busy."""
+        held = False                       # plain: this thread holds cold_lock
         while True:
             if state[i] == "active":
                 busy[i] = True
                 return
-            n_active = sum(s == "active" for s in state)
+            n_active = sum(s in ("active", "waking") for s in state)   # a waking model already counts
             if n_active < ACTIVE:
                 break
             idle = [k for k in range(N) if state[k] == "active" and not busy[k]]
@@ -143,7 +147,11 @@ def main():
                 if mode == "seg":
                     call(v, "park")
                 else:
-                    pipes[v].send(("stop",)); procs[v].join(30)
+                    if not held:
+                        cold_lock.acquire(); held = True
+                    pipes[v].send(("stop",)); procs[v].join(60)
+                    if procs[v].is_alive():
+                        procs[v].kill(); procs[v].join()
             finally:
                 cond.acquire()
             state[v] = "parked" if mode == "seg" else "off"; busy[v] = False; last[v] = time.time()
@@ -160,7 +168,12 @@ def main():
                 call(i, "resume")
                 stats["wakes"] += 1; stats["wake_s"].append(time.perf_counter() - t)
             else:
-                spawn(i)
+                try:
+                    if not held:
+                        cold_lock.acquire(); held = True
+                    spawn(i)
+                finally:
+                    cold_lock.release()
                 stats["colds"] += 1; stats["cold_s"].append(time.perf_counter() - t)
         finally:
             cond.acquire()

@@ -227,6 +227,7 @@ class Broker:
         self.budget = budget
         self.used_at = {}        # name -> counter value at last open or release, for LRU
         self.clock = 0
+        self.pending = {}        # name -> bytes reserved for a load in progress
         self.lock = threading.Lock()                          # guards the dicts only
         self.load_locks = {n: threading.Lock() for n in self.files}   # a slow load blocks its own name only
 
@@ -235,13 +236,19 @@ class Broker:
         self.used_at[name] = self.clock
 
     def _make_room(self, name, need):
-        """Evict unmapped segments, least recently used first, until `need` bytes fit."""
+        """Evict unmapped segments, least recently used first, until `need` bytes fit.
+
+        On success, `need` stays reserved in self.pending until the load ends. Without
+        the reservation, two names that load at the same time both pass the check and the broker
+        goes over the budget: on an A100 this made restores and vLLM steps fail with out of memory.
+        """
         if self.budget is None:
             return True
         while True:
             with self.lock:
-                used = sum(v["size"] for v in self.loaded.values())
+                used = sum(v["size"] for v in self.loaded.values()) + sum(self.pending.values())
                 if used + need <= self.budget:
+                    self.pending[name] = need
                     return True
                 idle = sorted((self.used_at.get(n, 0), n) for n in self.loaded if n != name and not self.mapped.get(n))
             for _, victim in idle:
@@ -297,8 +304,11 @@ class Broker:
                             return dict(ok=False, error="device memory budget is full of mapped segments"), None
                         handle, fd, size = self.device.load(self.files[name], layout, total)
                     except (OSError, ValueError, SegmentError) as e:
+                        with self.lock:
+                            self.pending.pop(name, None)
                         return dict(ok=False, error=f"load failed: {e}"), None
                     with self.lock:
+                        self.pending.pop(name, None)
                         self.generation[name] = self.generation.get(name, 0) + 1
                         s = self.loaded[name] = dict(handle=handle, fd=fd, size=size, layout=layout, generation=self.generation[name])
                         self.mapped[name] = 0

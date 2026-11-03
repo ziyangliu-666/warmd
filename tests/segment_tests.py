@@ -225,6 +225,30 @@ class BrokerTests(unittest.TestCase):
         self.assertEqual((reply["ok"], fd), (False, None))
         self.assertEqual(sorted(b.loaded), ["a"])
 
+    def test_budget_counts_a_load_in_progress(self):
+        # Two names that load at the same time must not both fit in room for one.
+        files = {n: os.path.join(self.dir, f"{n}.safetensors") for n in "ab"}
+        for p in files.values():
+            write_safetensors(p, {"w": ("U8", [8], bytes(8))})
+        started, go = threading.Event(), threading.Event()
+        dev, load = self.dev, self.dev.load
+
+        def slow_load(*args):
+            started.set()
+            go.wait(5)
+            return load(*args)
+        dev.load = slow_load
+        b = S.Broker(files, dev, budget=2 << 20)
+        t = threading.Thread(target=b.request, args=(self.me, {"op": "open", "name": "a"}, b.new_connection()))
+        t.start()
+        started.wait(5)
+        dev.load = load
+        reply, fd = b.request(self.me, {"op": "open", "name": "b"}, b.new_connection())
+        go.set()
+        t.join(5)
+        self.assertEqual((reply["ok"], fd), (False, None))
+        self.assertEqual((sorted(b.loaded), b.pending), (["a"], {}))
+
     @unittest.skipUnless(hasattr(socket, "SO_PEERCRED"), "SO_PEERCRED is Linux only")
     def test_served_over_a_socket(self):
         path = os.path.join(self.dir, "s.sock")
