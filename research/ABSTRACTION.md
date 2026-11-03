@@ -73,7 +73,7 @@ warmd stays useful for the second and third rows. On the second row, a segment m
 - Two GPU models, two driver branches, PyTorch only, no multi-GPU models.
 - Hibernation, park and evict under load, and vLLM were not run in gVisor.
 - The gVisor change is unreviewed and ran with a forced driver version on one machine. It has no security review.
-- The fleet saving is a model: 2.4 to 24 times when memory is the limit, and none when compute is the limit (Result 21).
+- The fleet saving is a model: usable device memory divided by model size, so 2.4 to 24 times for 16 GB to 1.6 GB models, and none for a model that fills the GPU or when compute is the limit (Results 21 and 26). Packing creates this saving. Segments make it safe between tenants who do not trust each other.
 
 ## Prior work
 
@@ -81,8 +81,8 @@ The exact combination did not appear in two searches, which is weak evidence. Cl
 
 ## Next experiments, in order
 
-1. Run the fleet model with GPU request sizes and rates. This decides which row of the saving applies.
-2. Run the state ladder in gVisor, including cuda-checkpoint.
+1. Run the state ladder in gVisor, including cuda-checkpoint.
+2. Measure real batched token rates, and add KV memory to the fleet model. Find a trace that links many GPU models to their arrivals.
 3. Turn the vLLM result into a supported interface, and test a larger model with requests in flight.
 4. Review the nvproxy change for security, then offer it to gVisor.
 

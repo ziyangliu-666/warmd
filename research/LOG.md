@@ -350,6 +350,30 @@ Not tested in gVisor: hibernation with cuda-checkpoint, park and evict under loa
 
 Spend: the VM ran 0.41 hours at about $0.09 per hour, about $0.04 by estimate. Account credit went from 9.98 to 9.95.
 
+## Result 26: which capacity row fits LLM traffic (computed, `results/h26_llm.json`, `scripts/llm_service.py`)
+
+Public Azure LLM inference traces, about one hour each. Earlier I said GPU request data was out of reach. That was wrong: public data exists.
+
+| trace | requests/s | context tokens, median | generated tokens, median |
+|---|---:|---:|---:|
+| conversation | 5.53 | 1020 | 129 |
+| code | 2.57 | 1469 | 13 |
+
+Assumed batched rates, not measured: prefill 2000 to 40000 tokens/s, decode 300 to 6000 tokens/s. That gives 0.06 to 1.28 GPU seconds per request, so the model is limited by memory in nearly every case. Only 1.6 GB models at the lowest rates are limited by compute.
+
+| model size | saving, memory-limited |
+|---:|---:|
+| 1.6 GB | 23.8 times |
+| 8 GB | 4.8 times |
+| 16 GB | 2.4 times |
+| 40 GB | 1.0 times: none |
+
+- The saving is usable device memory divided by model size. It comes from packing.
+- A single-process LRU would pack the same way, without isolation. So segments do not create this saving. They make it available between tenants who do not trust each other.
+- A model that fills a GPU gains nothing here. Frontier models are out of scope for this saving.
+- KV memory for active requests is not in the model, so real savings are lower.
+- These traces show large services, not the long tail, and arrivals in the model still come from CPU functions. No public trace links many small GPU models to their arrivals.
+
 ## Process lessons
 
 - A surprising good number needs a check before a bad one does. Three of mine were wrong: the 8-byte alignment "noise", the unfair lease, and NaN at 84 tasks/s.
