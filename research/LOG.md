@@ -435,6 +435,27 @@ Spend: this VM ran 1.36 hours, about $0.13 by estimate. Credit went from 9.95 to
 
 The driver checks only the device number of the fd, then trusts the file's private data. Version 1 of the change let any host-backed file reach that check, which exposes a type confusion if the host gives the sandbox a block device numbered 195:255. Version 2 checks with fstat for the control character device first. It compiles for linux/amd64 (`results/h31_patch_v2.diff`). It has not run on a GPU.
 
+## Result 31: one hardware queue on an A100 (measured, `results/h32.jsonl`)
+
+A100-SXM4-40GB, driver 580.178.04, persistence mode on. Three rounds of each start test.
+
+| measure | default | one connection |
+|---|---:|---:|
+| parallel starts, 16 processes | 4.34, 4.41, 4.36 per s | 12.37, 12.30, 12.40 per s |
+| context creation | 135 to 165 ms | 76 to 88 ms |
+| bare context device memory | 427 MiB | 426 MiB |
+| parallel restore, 8 processes | 5.86 per s | 10.69 per s |
+| sequential restore | 3.28 per s | 4.71 per s |
+| single-stream forward, 1.6 GB model | 2.83 ms | 2.88 ms |
+| 128 by 128 matmuls, 4 or 8 streams | 56448, 56597 ops/s | 60149, 60608 ops/s |
+| 512 by 512 matmuls, 4 or 8 streams | 46069, 46016 ops/s | 38229, 38421 ops/s |
+
+- The RTX 3060 result holds on the A100: starts rise 2.8 times and restores 1.8 times.
+- The cost is real: when kernels from several streams could overlap, one queue loses 17%. Single-stream work does not change. Use it per process, for inference processes with one stream.
+- Bare context memory is 427 MiB here and 109 MiB on the RTX 3060, about 1.0% and 0.9% of device memory. No setting changes it.
+
+Spend: about $0.06.
+
 ## Process lessons
 
 - Add the obvious control before crediting a new tool: persistence mode explained most of the MPS start-up gain.

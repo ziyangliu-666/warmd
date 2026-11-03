@@ -1,0 +1,16 @@
+{"bare":"default","smi_delta_mib":427,"self":{"init_ms":102.3,"ctx_ms":164.5,"first_alloc_ms":0.18,"used_by_ctx_mib":425,"used_after_alloc_mib":427}}
+{"bare":"connections1","smi_delta_mib":426,"self":{"init_ms":69.7,"ctx_ms":76.4,"first_alloc_ms":0.18,"used_by_ctx_mib":424,"used_after_alloc_mib":426}}
+{"parallel_16":"default","per_s":4.34}
+{"parallel_16":"connections1","per_s":12.37}
+{"bare":"default","smi_delta_mib":427,"self":{"init_ms":56.2,"ctx_ms":135.0,"first_alloc_ms":0.20,"used_by_ctx_mib":425,"used_after_alloc_mib":427}}
+{"bare":"connections1","smi_delta_mib":426,"self":{"init_ms":64.6,"ctx_ms":78.4,"first_alloc_ms":0.19,"used_by_ctx_mib":424,"used_after_alloc_mib":426}}
+{"parallel_16":"default","per_s":4.41}
+{"parallel_16":"connections1","per_s":12.30}
+{"bare":"default","smi_delta_mib":427,"self":{"init_ms":56.3,"ctx_ms":139.5,"first_alloc_ms":0.19,"used_by_ctx_mib":425,"used_after_alloc_mib":427}}
+{"bare":"connections1","smi_delta_mib":426,"self":{"init_ms":61.2,"ctx_ms":87.8,"first_alloc_ms":0.18,"used_by_ctx_mib":424,"used_after_alloc_mib":426}}
+{"parallel_16":"default","per_s":4.36}
+{"parallel_16":"connections1","per_s":12.40}
+{"connections": "default", "device": "NVIDIA A100-SXM4-40GB", "streams1_mm128_ops_s": 55405, "streams4_mm128_ops_s": 56448, "streams8_mm128_ops_s": 56597, "streams1_mm512_ops_s": 35821, "streams4_mm512_ops_s": 46069, "streams8_mm512_ops_s": 46016, "forward_ms": 2.83}
+{"connections": "1", "device": "NVIDIA A100-SXM4-40GB", "streams1_mm128_ops_s": 59195, "streams4_mm128_ops_s": 60149, "streams8_mm128_ops_s": 60608, "streams1_mm512_ops_s": 35776, "streams4_mm512_ops_s": 38229, "streams8_mm512_ops_s": 38421, "forward_ms": 2.88}
+{"connections":"default","test": "hibernate_rate", "procs": 8, "base_mib": 503, "parked_mib": 6318, "hibernated_mib": 2031, "restored_mib": 6318, "freed_per_proc_mib": 535.9, "rss_parked_mib": 1171, "rss_hibernated_mib": 1641, "checkpoint_all_parallel_s": 1.218, "restore_sequential_per_s": 3.28, "checkpoint_sequential_per_s": 2.03, "restore_parallel_per_s": 5.86, "wrong": 0, "serve_ms_mean": 5.4}
+{"connections":"one","test": "hibernate_rate", "procs": 8, "base_mib": 503, "parked_mib": 6310, "hibernated_mib": 2031, "restored_mib": 6310, "freed_per_proc_mib": 534.9, "rss_parked_mib": 1124, "rss_hibernated_mib": 1640, "checkpoint_all_parallel_s": 0.949, "restore_sequential_per_s": 4.71, "checkpoint_sequential_per_s": 2.19, "restore_parallel_per_s": 10.69, "wrong": 0, "serve_ms_mean": 5.3}
