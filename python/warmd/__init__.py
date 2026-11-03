@@ -1,4 +1,5 @@
-"""Run short GPU tasks in separate processes forked from warm processes. See docs/python.md."""
+"""Elastic GPU processes. warmd.segments shares read-only weights (docs/segments.md).
+ZygotePool runs short tasks in processes forked from warm ones (docs/python.md)."""
 from .pool import ZygotePool, TaskError
 
 __all__ = ["ZygotePool", "TaskError"]

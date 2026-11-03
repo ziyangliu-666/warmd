@@ -1,0 +1,1 @@
+{"test": "real_checkpoint_hf", "dtype": "torch.bfloat16", "logits_max_abs_diff": 0.0, "same_text_without_generation_config": false, "same_text": true, "sample": "The capital of France is Paris. It was founded in 789 AD by Charlemagn", "native_s": 2.7, "mapped_s": 2.692}

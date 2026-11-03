@@ -1,0 +1,3 @@
+{"impl": "runc", "test": "ckpt", "ok": true, "used_before_mib": 1811, "checkpoint_ms": 180, "restore_ms": 229, "same": true, "out": ""}
+{"impl": "runc_connections1", "test": "ckpt", "ok": true, "used_before_mib": 1810, "checkpoint_ms": 172, "restore_ms": 121, "same": true, "out": ""}
+{"impl": "gvisor", "test": "ckpt", "ok": true, "used_before_mib": 1811, "checkpoint_ms": 390, "restore_ms": 468, "same": true, "out": ""}

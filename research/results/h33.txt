@@ -1,0 +1,28 @@
+== version 1: owner in runc, client in gVisor
+  connect ok pid=1 uid=0
+  fd ok -> host:[4]
+  PASS import_ms=0.70 map_ms=0.69 delta_mib=0 head=abcd1234 tail=abcd1234 write_result=1
+== version 1: control, one sandbox
+  PASS import_ms=0.78 map_ms=0.76 delta_mib=0 head=abcd1234 tail=abcd1234 write_result=1
+== version 1: negative files
+  /x/xc            result=101 rejected
+  /dev/null        result=101 rejected
+  /dev/nvidia0     result=101 rejected
+  /dev/nvidiactl   result=101 rejected
+== version 2: owner in runc, client in gVisor
+  connect ok pid=1 uid=0
+  fd ok -> host:[4]
+  PASS import_ms=0.60 map_ms=0.61 delta_mib=0 head=abcd1234 tail=abcd1234 write_result=1
+== version 2: control, one sandbox
+  PASS import_ms=0.41 map_ms=0.56 delta_mib=0 head=abcd1234 tail=abcd1234 write_result=1
+== version 2: negative files
+  /x/xc            result=101 rejected
+  /dev/null        result=101 rejected
+  /dev/nvidia0     result=101 rejected
+  /dev/nvidiactl   result=101 rejected
+== runc negative files
+  /x/xc            result=101 rejected
+  /dev/null        result=101 rejected
+  /dev/nvidia0     result=101 rejected
+  /dev/nvidiactl   result=101 rejected
+h33-done

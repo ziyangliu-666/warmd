@@ -1,0 +1,13 @@
+docker.io/library/python:3.11-slim
+[notice] To update, run: pip install --upgrade pip
+2 1.598070784 GB
+broker ready
+== native, runc
+{"test": "native", "gb": 2, "native_sum": -10.301668167114258, "native_ms": 6.68}
+== mapped, runc
+{"test": "equal", "gb": 2, "first_open_s": 1.393, "mapped_sum": -10.301668167114258, "mapped_ms": 6.64}
+== mapped, gVisor patched
+{"test": "equal", "gb": 2, "first_open_s": 0.01, "mapped_sum": -10.301668167114258, "mapped_ms": 7.86}
+== fault: bystander in runc, writer also in runc
+{"test": "fault", "gb": 2, "writer": "faulted: Failed to find C compiler. Please specify via CC environment variable.", "report_ms": 10, "before": -0.004192352294921875, "bystander_same_output": true, "bystander_alive": true, "weight_changed": false}
+== fault: all in gVisor patched
