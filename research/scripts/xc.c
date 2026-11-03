@@ -15,7 +15,8 @@
 #include <unistd.h>
 #define CK(x) do { CUresult r_ = (x); if (r_) { const char* s_ = ""; cuGetErrorString(r_, &s_); printf("  FAIL %s: %d %s\n", #x, r_, s_); fflush(stdout); return 1; } } while (0)
 static double now(void) { struct timespec t; clock_gettime(CLOCK_MONOTONIC, &t); return t.tv_sec + t.tv_nsec * 1e-9; }
-static int open_ctx(CUdevice* dev) { CUcontext c; CK(cuInit(0)); CK(cuDeviceGet(dev, 0)); CK(cuCtxCreate(&c, 0, *dev)); return 0; }
+// The primary context API has one version on every driver branch; cuCtxCreate does not.
+static int open_ctx(CUdevice* dev) { CUcontext c; CK(cuInit(0)); CK(cuDeviceGet(dev, 0)); CK(cuDevicePrimaryCtxRetain(&c, *dev)); CK(cuCtxSetCurrent(c)); return 0; }
 static int map(CUmemGenericAllocationHandle h, size_t n, CUdevice dev, int flag, CUdeviceptr* va) {
   CK(cuMemAddressReserve(va, n, 0, 0, 0)); CK(cuMemMap(*va, n, 0, h, 0));
   CUmemAccessDesc d; memset(&d, 0, sizeof d); d.location.type = CU_MEM_LOCATION_TYPE_DEVICE; d.location.id = dev; d.flags = flag; CK(cuMemSetAccess(*va, n, &d, 1)); return 0; }

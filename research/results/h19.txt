@@ -1,0 +1,32 @@
+== A: no containers
+  connect ok pid=3395 uid=0
+  fd ok -> /dev/nvidiactl
+  PASS import_ms=0.07 map_ms=0.17 delta_mib=0 head=abcd1234 tail=abcd1234 write_result=1
+== B: two containers, separate pid, mount, net and ipc namespaces
+  connect ok pid=1 uid=0
+  fd ok -> /dev/nvidiactl
+  PASS import_ms=0.07 map_ms=0.18 delta_mib=0 head=abcd1234 tail=abcd1234 write_result=1
+  rc=0
+         0          0 4294967295
+pid:[4026532725]
+pid:[4026531836]
+== C: client with another uid
+  connect ok pid=1 uid=65534
+  fd ok -> /dev/nvidiactl
+  PASS import_ms=0.07 map_ms=0.17 delta_mib=0 head=abcd1234 tail=abcd1234 write_result=1
+  rc=0
+== D: owner container exits after sending
+  connect ok pid=1 uid=0
+  fd ok -> /dev/nvidiactl
+  PASS import_ms=0.07 map_ms=0.21 delta_mib=0 head=abcd1234 tail=abcd1234 write_result=1
+  rc=0
+owner state: Exited (0) Less than a second ago
+== E: client with no capabilities and read-only rootfs
+  connect ok pid=1 uid=0
+  fd ok -> /dev/nvidiactl
+  PASS import_ms=0.07 map_ms=0.17 delta_mib=0 head=abcd1234 tail=abcd1234 write_result=1
+  rc=0
+== F: owner in runc, client in gVisor with nvproxy
+docker: Error response from daemon: unknown or invalid runtime name: runsc.
+See 'docker run --help'.
+  rc=0
