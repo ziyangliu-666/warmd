@@ -1,0 +1,27 @@
+diff --git a/pkg/sentry/devices/nvproxy/frontend.go b/pkg/sentry/devices/nvproxy/frontend.go
+index 2152b3c..4667a84 100644
+--- a/pkg/sentry/devices/nvproxy/frontend.go
++++ b/pkg/sentry/devices/nvproxy/frontend.go
+@@ -1045,12 +1045,18 @@ func ctrlHasFrontendFD[Params any, PtrParams hasFrontendFDPtr[Params]](fi *front
+ 		return 0, linuxerr.EINVAL
+ 	}
+ 	defer ctlFileGeneric.DecRef(fi.ctx)
+-	ctlFile, ok := ctlFileGeneric.Impl().(*frontendFD)
+-	if !ok {
++	var hostFD int32
++	switch f := ctlFileGeneric.Impl().(type) {
++	case *frontendFD:
++		hostFD = f.hostFD
++	case interface{ HostFD() int }:
++		// Received from outside the sandbox. The driver checks that it is the control device.
++		hostFD = int32(f.HostFD())
++	default:
+ 		return 0, linuxerr.EINVAL
+ 	}
+ 
+-	ctrlParams.SetFrontendFD(ctlFile.hostFD)
++	ctrlParams.SetFrontendFD(hostFD)
+ 	n, err := rmControlInvoke(fi, ioctlParams, ctrlParams)
+ 	ctrlParams.SetFrontendFD(origFD)
+ 	if err != nil {
+NVIDIA GeForce RTX 3060, 535.183.01

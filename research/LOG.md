@@ -301,9 +301,54 @@ Predictions for `run_h19.sh`, written before any run:
 
 If F fails as predicted, sharing across gVisor sandboxes needs a change in nvproxy. Possession of the fd is the capability, so a broker must control who receives it. The forum report of failure across containers was on CUDA 11.3 and did not reach a cause.
 
-## Blocked: cross-container test
+## Result 23: cross-container sharing (measured, `results/h19.txt`, `results/h19b.txt`)
 
-`scripts/xc.c` and `scripts/run_h19.sh` are written and have not run. They cover two containers, a second uid, an owner that exits, a client with no capabilities, and a client in gVisor with nvproxy. On 2026-11-03 the rental failed with `insufficient_credit`: account credit is 0 and balance is -0.018. A100 instance 58531275 showed `exited` when it was destroyed, which fits the credit running out, but this is not confirmed. All A100 results had been copied before that.
+RTX 3060 in a VM, driver 535.183.01, a second GPU model and driver branch. 1 GiB segment. All predictions from Result 22 held.
+
+| case | predicted | result |
+|---|---|---|
+| A, no containers | pass | pass; import 0.07 ms, map 0.17 ms |
+| B, two containers, different pid namespaces | pass | pass; import 0.07 ms, map 0.18 ms |
+| C, client uid 65534 | pass | pass |
+| D, owner container exited before the import | pass | pass |
+| E, client with no capabilities and read-only root | pass | pass |
+| H, client in an unprivileged user namespace | none | pass |
+| G1, owner and client in one gVisor sandbox (control) | none | pass; import 0.44 ms |
+| F, owner outside, client in gVisor | fail | fail with CUDA error 101; the fd shows as `host:[4]` |
+| F2, owner in gVisor, client outside | none | invalid test: the socket stays inside the sandbox |
+
+The earlier forum failure across containers does not reproduce here. Cause unknown. The error it reported, invalid device, is the same code that case F returns.
+
+## Result 24: a nvproxy change for gVisor (measured, `results/h21b.txt`, `results/h21_patch.diff`)
+
+`scripts/gvisor_nvproxy_host_fd.py` makes `ctrlHasFrontendFD` accept a host fd: 9 lines added, 3 removed, in one file.
+
+| case | result |
+|---|---|
+| F, patched | pass; import 0.86 ms, map 0.58 ms, delta 0 MiB, write rejected |
+| F, patched, second sandbox | pass |
+| F, unpatched, same setup | fail with error 101 |
+| ordinary file, patched and runc | rejected with error 101 |
+
+Limits: built from the go branch of 2026-11-02, with driver version forced to 535.183.06, because 535.183.01 is not on the supported list. No security review. gVisor maintainers have not seen it.
+
+## Result 25: real kernels across boundaries (measured, `results/h22.txt`, `results/h23.txt`)
+
+The broker runs in one runc container, 1.6 GB Llama graph with random weights.
+
+| client | output | forward pass |
+|---|---|---:|
+| runc, ordinary weights | -10.301668167114258 | 6.68 ms |
+| runc, segment | -10.301668167114258 | 6.64 ms |
+| gVisor patched, segment | -10.301668167114258 | 7.86 ms |
+
+A real kernel (`fill_`) stores into read-only weights. In all four combinations of runc and gVisor for writer and bystander, the writer gets `illegal memory access`, its store to ordinary memory works, and the bystander's output and weights do not change.
+
+Failure kept for the record: the first fault test reported "faulted", but the message was "Failed to find C compiler". Triton never ran. Read the text of a pass condition, not only its presence.
+
+Not tested in gVisor: hibernation with cuda-checkpoint, park and evict under load, and vLLM.
+
+Spend: the VM ran about 1.2 hours at about $0.09 per hour.
 
 ## Process lessons
 

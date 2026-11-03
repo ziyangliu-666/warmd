@@ -1,6 +1,6 @@
 # Separate lifetimes: segments, contexts and processes
 
-Status: a research result from one A100, driver 570, on 2026-11-02 and 2026-11-03. See `LOG.md` for data and failures. It is not a production design.
+Status: a research result from one A100 (driver 570) and one RTX 3060 (driver 535), on 2026-11-02 and 2026-11-03. See `LOG.md` for data and failures. It is not a production design.
 
 ## The claim
 
@@ -42,6 +42,8 @@ On a real engine, vLLM with Qwen2.5-0.5B, the lowest state holds 503 MiB of shar
 
 On ten real minutes of arrivals, isolated processes on segments reach a p99 of 141 ms, against 147 ms for one unisolated process and 3891 ms for a favoured scale-to-zero simulation (Result 19).
 
+Segments cross trust boundaries. Two containers, another uid, a user namespace, no capabilities, and an exited owner all work with the unmodified driver. A gVisor sandbox works with a 9-line nvproxy change, and real kernels there give the same output with fault isolation (Results 23 to 25).
+
 ## Where it sits against warmd
 
 warmd joined two ideas. The separation shows that they are independent choices:
@@ -68,9 +70,9 @@ warmd stays useful for the second and third rows. On the second row, a segment m
 
 - The real arrival trace comes from CPU functions (Result 18). It shows a large idle share for that shape, but no GPU fleet data was available. The real saving is unknown.
 - One real checkpoint and vLLM 0.6.6 work (Result 16), on one small model. Other engines and larger models are not tested.
-- One GPU model, one driver branch, PyTorch only, no multi-GPU models.
-- A second uid works: uid 65534 mapped a root broker's segment, with the same output and 12.08 ms per forward pass. Everything ran in one container, because the rented container cannot create namespaces. A forum report says exported fds do not cross containers, and NVIDIA's documentation ties multi-user isolation to IMEX channels. Neither is tested. This is the largest open risk.
-- Device-memory files under gVisor are untested. Source reading predicts that an fd from outside a sandbox fails in nvproxy without a change (Result 22).
+- Two GPU models, two driver branches, PyTorch only, no multi-GPU models.
+- Hibernation, park and evict under load, and vLLM were not run in gVisor.
+- The gVisor change is unreviewed and ran with a forced driver version on one machine. It has no security review.
 - The fleet saving is a model: 2.4 to 24 times when memory is the limit, and none when compute is the limit (Result 21).
 
 ## Prior work
@@ -79,11 +81,11 @@ The exact combination did not appear in two searches, which is weak evidence. Cl
 
 ## Next experiments, in order
 
-1. Share a segment across two containers: `scripts/run_h19.sh`, on a VM with Docker and the NVIDIA runtime. It has not run. If it fails, the multi-tenant case needs another path.
-2. Measure the idle share on a GPU fleet trace. If it is low, there is little to reclaim.
+1. Run the fleet model with GPU request sizes and rates. This decides which row of the saving applies.
+2. Run the state ladder in gVisor, including cuda-checkpoint.
 3. Turn the vLLM result into a supported interface, and test a larger model with requests in flight.
-4. Run under gVisor with a GPU.
+4. Review the nvproxy change for security, then offer it to gVisor.
 
 ## Reproduce
 
-Scripts are in `scripts/`, run on the machine with the GPU, from `/workspace/exp`. Start with `make_models.py`, then the `run_*.sh` script for each result. The tools expect the warmd build at `/workspace/warmd`.
+Scripts are in `scripts/`, run on the machine with the GPU, from `/workspace/exp`. Start with `make_models.py`, then the `run_*.sh` script for each result. The tools expect the warmd build at `/workspace/warmd`. The cross-container scripts (`run_h19*.sh`, `run_h21*.sh`, `run_h22.sh`, `run_h23.sh`) need a VM with Docker and the NVIDIA runtime.
