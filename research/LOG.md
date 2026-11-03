@@ -263,6 +263,10 @@ Qwen2.5-0.5B, vLLM 0.6.6, three prompts, 64 tokens. At park the process unmaps w
 
 Computed: 14.6 times faster to the first result than a real cold start, with 11.6 times less device memory than running. The 503 MiB is the broker's context, which many processes share. Limits: the KV pool's contents are lost, so prefix caching does not survive; the first load used a saved copy of the engine's own weights.
 
+## Blocked: cross-container test
+
+`scripts/xc.c` and `scripts/run_h19.sh` are written and have not run. They cover two containers, a second uid, an owner that exits, a client with no capabilities, and a client in gVisor with nvproxy. On 2026-11-03 the rental failed with `insufficient_credit`: account credit is 0 and balance is -0.018. A100 instance 58531275 showed `exited` when it was destroyed, which fits the credit running out, but this is not confirmed. All A100 results had been copied before that.
+
 ## Process lessons
 
 - A surprising good number needs a check before a bad one does. Three of mine were wrong: the 8-byte alignment "noise", the unfair lease, and NaN at 84 tasks/s.

@@ -78,7 +78,7 @@ The exact combination did not appear in two searches, which is weak evidence. Cl
 
 ## Next experiments, in order
 
-1. Share a segment across two containers. This needs a machine that allows namespaces. If it fails, the multi-tenant case needs another path.
+1. Share a segment across two containers: `scripts/run_h19.sh`, on a VM with Docker and the NVIDIA runtime. It has not run. If it fails, the multi-tenant case needs another path.
 2. Measure the idle share on a GPU fleet trace. If it is low, there is little to reclaim.
 3. Turn the vLLM result into a supported interface, and test a larger model with requests in flight.
 4. Run under gVisor with a GPU.
