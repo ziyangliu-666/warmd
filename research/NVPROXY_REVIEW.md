@@ -1,6 +1,6 @@
 # Review of the nvproxy change for segments in gVisor
 
-Scope: `scripts/gvisor_nvproxy_host_fd.py`, applied to gVisor's go branch of 2026-11-02. Version 1 ran on an RTX 3060 (Results 24, 25, 29). Version 2 adds a device check. It compiles for linux/amd64 and has not run on a GPU. Diff: `results/h31_patch_v2.diff`.
+Scope: `scripts/gvisor_nvproxy_host_fd.py`, applied to gVisor's go branch of 2026-11-02. Version 1 ran on an RTX 3060 (Results 24, 25, 29). Version 2 adds a device check. It ran on an RTX 3060 with driver 570.195.03 (Result 32). Diff: `results/h31_patch_v2.diff`.
 
 ## What the change does
 
@@ -18,5 +18,5 @@ Scope: `scripts/gvisor_nvproxy_host_fd.py`, applied to gVisor's go branch of 202
 ## Not covered
 
 - No fuzzing and no review by gVisor maintainers.
-- Version 2 has not run on hardware.
+- The block-device case that version 2 closes was not tested, because such a device cannot be opened without a driver.
 - Interaction with nvproxy's driver-version checks: version 1 ran with a forced version on driver 535, and on 570.195.03, which is supported.

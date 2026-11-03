@@ -456,6 +456,23 @@ A100-SXM4-40GB, driver 580.178.04, persistence mode on. Three rounds of each sta
 
 Spend: about $0.06.
 
+## Result 32: version 2 of the nvproxy change on hardware (measured, `results/h33.txt`, `results/h33_host_fds.txt`)
+
+RTX 3060 VM, driver 570.195.03, both versions built from the same gVisor commit.
+
+| case | version 1 | version 2 |
+|---|---|---|
+| owner in runc, client in gVisor | pass; import 0.70 ms | pass; import 0.60 ms |
+| owner and client in one sandbox | pass | pass |
+| host fd of `/dev/null`, `/dev/nvidia0`, a fresh `/dev/nvidiactl`, a regular file, sent into the sandbox | all rejected, error 101 | all rejected, error 101 |
+
+- Version 2 keeps the working case and rejects every host fd tried.
+- The tests cannot tell the two versions apart. The only case that version 2 adds protection for, a block device numbered 195:255, cannot be opened without a driver behind it, so it was not tested. Its value is defence in depth.
+- A fresh `/dev/nvidiactl` is rejected because it holds no exported handle.
+- The kernel log showed no NVIDIA messages during the negative cases.
+
+Spend for this VM: 0.23 hours, about $0.02. Account credit is 9.74 after both validation runs, against the approved cap of $3.
+
 ## Process lessons
 
 - Add the obvious control before crediting a new tool: persistence mode explained most of the MPS start-up gain.
