@@ -374,7 +374,67 @@ Assumed batched rates, not measured: prefill 2000 to 40000 tokens/s, decode 300 
 - KV memory for active requests is not in the model, so real savings are lower.
 - These traces show large services, not the long tail, and arrivals in the model still come from CPU functions. No public trace links many small GPU models to their arrivals.
 
+## Result 27: what a context costs, and how to cut it (measured, `results/h28.jsonl`, `results/h28b.jsonl`)
+
+RTX 3060, driver 570.195.03 in a VM. Bare start in C, then PyTorch in a container.
+
+| setting | cuInit | context | device memory | parallel starts per second, 16 processes |
+|---|---:|---:|---:|---:|
+| no persistence mode | 562 ms | 160 ms | 109 MiB | 4.01 |
+| no persistence, one connection | 575 ms | 57 ms | 109 MiB | 8.67 |
+| persistence mode | 36 ms | 197 ms | 109 MiB | 4.81 |
+| persistence, one connection | 35 ms | 86 ms | 109 MiB | 14.16 |
+| persistence and MPS | 13 ms | 133 ms | 102 MiB | 7.53 |
+| persistence, MPS, one connection | 13 ms | 88 ms | 102 MiB | 13.10 |
+
+"One connection" is `CUDA_DEVICE_MAX_CONNECTIONS=1`, so the driver creates one hardware queue.
+
+- My MPS result first looked like a 47 times faster cuInit. The persistence control shows that persistence mode alone gives most of it. MPS is not needed for that.
+- One connection is the largest single gain: the start rate rises 2.9 times, and warmd was built for the old rate. The cost: streams share one queue, which can add false dependencies. Not measured.
+- No setting reduced device memory. PyTorch adds about 41 MiB, for about 150 MiB per process.
+- Bare context memory is 109 MiB here and about 497 MiB per PyTorch process on the A100. Both are about 1.2% of device memory. Two points do not show a law.
+
+## Result 28: MPS on the context axis (measured, `results/h28b.jsonl`, `results/h29.jsonl`)
+
+Same GPU. 256 by 256 matmuls, operations per second:
+
+| design | 1 process | 8 processes | p99, 8 processes |
+|---|---:|---:|---:|
+| native contexts | 14761 | 11667 | 0.74 ms |
+| MPS | 10998 | 74803 | 0.13 ms |
+| warmd | 3865 | 60385 | 0.18 ms |
+
+- With MPS, a wild store into another process's address faults, so address spaces stay separate. But the fault killed the victim and the bystander: MPS shares one fault domain, like warmd.
+- Segments work under MPS: same output, park 0.43 ms, resume 1.19 ms.
+- So MPS replaces warmd for many short kernels in one trust domain, with no driver shim. warmd keeps fork after CUDA init.
+
+## Result 29: the ladder in gVisor (measured, `results/h29.jsonl`, `results/h30.jsonl`)
+
+Broker in runc, patched gVisor, 1.6 GB model, same output in every step.
+
+| step | runc | gVisor |
+|---|---:|---:|
+| forward pass | 6.68 ms | 8.01 ms |
+| park | 0.46 ms | 2.18 ms |
+| resume, resident | 1.13 ms | 3.91 ms |
+| reload after evict | 140.4 ms | 148.0 ms |
+| first forward after reload | 7.46 ms | 11.94 ms |
+| cuda-checkpoint | 180 ms | 390 ms |
+| restore | 229 ms; 121 ms with one connection | 468 ms |
+| fork from a zygote to first result | 0.77 to 0.87 s | 3.73 to 3.92 s |
+| importing PyTorch in the zygote | 9.3 s | 42.1 s |
+
+- My prediction from source was wrong: cuda-checkpoint works in gVisor. Reading only nvproxy's own files was not enough.
+- Restore rate with 8 processes in runc: 4.99 per second, 11.8 with one connection.
+- gVisor makes the process-free states slow, at 3.8 s to a result. Parked and hibernated processes matter more there.
+- vLLM did not run on this VM: the install pulled incompatible versions of transformers, tokenizers and huggingface-hub. The user said to drop it.
+
+Spend: this VM ran 1.36 hours, about $0.13 by estimate. Credit went from 9.95 to 9.82.
+
 ## Process lessons
+
+- Add the obvious control before crediting a new tool: persistence mode explained most of the MPS start-up gain.
+- A prediction from reading part of a code base is weak. cuda-checkpoint in gVisor was predicted to fail and worked.
 
 - A surprising good number needs a check before a bad one does. Three of mine were wrong: the 8-byte alignment "noise", the unfair lease, and NaN at 84 tasks/s.
 - Verify every output against a reference. It caught the NaN result.

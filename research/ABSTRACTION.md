@@ -52,13 +52,16 @@ warmd joined two ideas. The separation shows that they are independent choices:
 |---|---|---|
 | tenants that do not trust each other | one context each, shared segments | 3.76 new processes per second, isolated |
 | one trust domain, new process per task | one shared context, shared segments | 78.87 tasks per second, 7.5 GB model |
-| one trust domain, many short kernels at once | shared context | 22980 ops/s, against 16694 with a fair lease |
+| one trust domain, many short kernels at once | MPS, no shim | 74803 ops/s, against 60385 for warmd and 11667 for native contexts, RTX 3060 |
 
-warmd stays useful for the second and third rows. On the second row, a segment makes warmd 39 times faster at equal concurrency.
+On the second row, a segment makes warmd 39 times faster at equal concurrency. MPS takes the third row from warmd. warmd keeps one unique property: a process can fork after CUDA init.
+
+Two settings change the context cost more than any design here: persistence mode (cuInit 562 ms to 36 ms) and `CUDA_DEVICE_MAX_CONNECTIONS=1` (14.16 starts per second, against 4.81; restore 121 ms, against 229). Both are on the RTX 3060 only (Result 27).
 
 ## What it does not solve
 
-- The driver limit stays. New contexts and restores both run at about 3 to 6 per second per GPU.
+- The start rate is about 14 contexts per second with one hardware queue, and restores about 12 (Results 27 and 29). Measured on an RTX 3060 only; the A100 was not tested.
+- A context's device memory has no setting that reduces it: about 150 MiB per PyTorch process on the RTX 3060, and 497 MiB on the A100. Only hibernation frees it.
 - Host memory becomes the limit. A hibernated process costs 1412 MiB PSS, or an estimated 1137 MiB after a zygote fork (computed: 669 + 469). 62 GB holds about 50.
 - Weights must be immutable. Training and in-place updates need ordinary memory.
 - A segment frees weights only. vLLM keeps a 3.46 GiB KV pool unless the process releases it at park. Result 20 does this through engine internals, and the pool's contents are lost.
@@ -81,7 +84,7 @@ The exact combination did not appear in two searches, which is weak evidence. Cl
 
 ## Next experiments, in order
 
-1. Run the state ladder in gVisor, including cuda-checkpoint.
+1. Measure persistence mode and one connection on an A100, with a multi-stream workload for the false-dependency cost.
 2. Measure real batched token rates, and add KV memory to the fleet model. Find a trace that links many GPU models to their arrivals.
 3. Turn the vLLM result into a supported interface, and test a larger model with requests in flight.
 4. Review the nvproxy change for security, then offer it to gVisor.
