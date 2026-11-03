@@ -1,4 +1,4 @@
-<!-- Draft for google/gvisor, feature request. Not posted. -->
+<!-- Posted as https://github.com/google/gvisor/issues/16897 on 2026-11-03. -->
 
 # nvproxy: allow importing CUDA memory exported from outside the sandbox
 
