@@ -431,6 +431,10 @@ Broker in runc, patched gVisor, 1.6 GB model, same output in every step.
 
 Spend: this VM ran 1.36 hours, about $0.13 by estimate. Credit went from 9.95 to 9.82.
 
+## Result 30: security review of the nvproxy change (source reading, `NVPROXY_REVIEW.md`)
+
+The driver checks only the device number of the fd, then trusts the file's private data. Version 1 of the change let any host-backed file reach that check, which exposes a type confusion if the host gives the sandbox a block device numbered 195:255. Version 2 checks with fstat for the control character device first. It compiles for linux/amd64 (`results/h31_patch_v2.diff`). It has not run on a GPU.
+
 ## Process lessons
 
 - Add the obvious control before crediting a new tool: persistence mode explained most of the MPS start-up gain.

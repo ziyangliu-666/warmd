@@ -75,7 +75,7 @@ Two settings change the context cost more than any design here: persistence mode
 - One real checkpoint and vLLM 0.6.6 work (Result 16), on one small model. Other engines and larger models are not tested.
 - Two GPU models, two driver branches, PyTorch only, no multi-GPU models.
 - Hibernation, park and evict under load, and vLLM were not run in gVisor.
-- The gVisor change is unreviewed and ran with a forced driver version on one machine. It has no security review.
+- The gVisor change has a first review (`NVPROXY_REVIEW.md`). It found a type confusion that version 1 exposed, and version 2 closes it with a device check. Version 2 compiles and has not run on a GPU. No maintainer has reviewed it.
 - The fleet saving is a model: usable device memory divided by model size, so 2.4 to 24 times for 16 GB to 1.6 GB models, and none for a model that fills the GPU or when compute is the limit (Results 21 and 26). Packing creates this saving. Segments make it safe between tenants who do not trust each other.
 
 ## Prior work
@@ -87,7 +87,7 @@ The exact combination did not appear in two searches, which is weak evidence. Cl
 1. Measure persistence mode and one connection on an A100, with a multi-stream workload for the false-dependency cost.
 2. Measure real batched token rates, and add KV memory to the fleet model. Find a trace that links many GPU models to their arrivals.
 3. Turn the vLLM result into a supported interface, and test a larger model with requests in flight.
-4. Review the nvproxy change for security, then offer it to gVisor.
+4. Run version 2 of the nvproxy change on a GPU, then offer it to gVisor.
 
 ## Reproduce
 
