@@ -14,7 +14,7 @@ Both use the same KV pool size, the same trace and the same limit on active mode
 import gc, json, os, queue, subprocess, sys, threading, time
 import multiprocessing as mp
 
-N, ACTIVE = 16, 6
+N, ACTIVE = 16, int(os.environ.get("ACTIVE", "6"))
 HIB_AFTER = float(os.environ.get("HIB_AFTER", "2"))
 KILL_AT = float(os.environ.get("KILL_AT", "1e9"))     # kill and restart the broker at this second
 BUDGET_GIB = os.environ.get("BUDGET_GIB", "18")   # six resident segments: about the memory of six plain engines
@@ -64,7 +64,9 @@ def worker(i, mode, conn):
             c.park(f"m{i}"); w.cache_engine = None; w.gpu_cache = None
             gc.collect(); torch.cuda.synchronize(); torch.cuda.empty_cache(); conn.send(("parked",))
         elif msg[0] == "resume":
-            t = time.perf_counter(); c.resume(f"m{i}"); w._init_cache_engine(); conn.send(("resumed", time.perf_counter() - t))
+            t0 = time.perf_counter(); reloaded = c.resume(f"m{i}")
+            t1 = time.perf_counter(); w._init_cache_engine(); torch.cuda.synchronize()
+            conn.send(("resumed", t1 - t0, time.perf_counter() - t1, bool(reloaded)))
         else:
             os._exit(0)
 
@@ -84,6 +86,8 @@ def main():
     cond = threading.Condition()
     cold_lock = threading.Lock()   # plain: vLLM sizes its pool from free memory, so one engine changes at a time
     stats = dict(wakes=0, wake_s=[], colds=0, cold_s=[], restores=0, errors=0, tokens=0)
+    parts = dict(wait=[], restore=[], map=[], kv=[], checkpoint=[])   # seconds, one entry per wake or checkpoint
+    reloads = [0]
     broker = None
 
     def start_broker():
@@ -106,10 +110,13 @@ def main():
         procs[i], pipes[i] = p, a
         return msg[1]
 
-    def toggle(i):
+    def toggle(i, part=None):
+        t = time.perf_counter()
         r = subprocess.run([TOOL, "--toggle", "--pid", str(procs[i].pid)], capture_output=True, text=True)
         if r.returncode:
             raise RuntimeError(f"cuda-checkpoint on model {i}: {r.stdout} {r.stderr}")
+        if part:
+            parts[part].append(time.perf_counter() - t)
 
     def call(i, *msg):
         pipes[i].send(msg)
@@ -169,11 +176,14 @@ def main():
         try:
             if mode == "seg":
                 th = hib_threads.pop(i, None)
+                tw = time.perf_counter()
                 if th:
                     th.join()
+                parts["wait"].append(time.perf_counter() - tw)
                 if prev == "hib":
-                    toggle(i); stats["restores"] += 1
-                call(i, "resume")
+                    toggle(i, "restore"); stats["restores"] += 1
+                r = call(i, "resume")
+                parts["map"].append(r[1]); parts["kv"].append(r[2]); reloads[0] += r[3]
                 stats["wakes"] += 1; stats["wake_s"].append(time.perf_counter() - t)
             else:
                 try:
@@ -193,7 +203,7 @@ def main():
             with cond:
                 for k in range(N):
                     if state[k] == "parked" and not busy[k] and time.time() - last[k] > HIB_AFTER and k not in hib_threads:
-                        th = threading.Thread(target=toggle, args=(k,)); th.start(); hib_threads[k] = th; state[k] = "hib"
+                        th = threading.Thread(target=toggle, args=(k, "checkpoint")); th.start(); hib_threads[k] = th; state[k] = "hib"
 
     if mode == "seg":
         threading.Thread(target=hibernator, daemon=True).start()
@@ -250,7 +260,9 @@ def main():
                tokens_per_s=round(stats["tokens"] / wall, 1), p50_s=pct(.5), p90_s=pct(.9), p99_s=pct(.99), max_s=pct(1.0),
                wakes=stats["wakes"], wake_mean_s=round(sum(stats["wake_s"]) / max(1, len(stats["wake_s"])), 3), restores=stats["restores"],
                colds=stats["colds"], cold_mean_s=round(sum(stats["cold_s"]) / max(1, len(stats["cold_s"])), 1),
-               setup_used_mib=setup_used, used_mean_mib=round(sum(samples) / max(1, len(samples))), used_max_mib=max(samples or [0]), broker_killed=killed, dead_engines=stats.get("dead", 0))
+               setup_used_mib=setup_used, used_mean_mib=round(sum(samples) / max(1, len(samples))), used_max_mib=max(samples or [0]), broker_killed=killed, dead_engines=stats.get("dead", 0),
+               hib_after=HIB_AFTER, budget_gib=BUDGET_GIB, reloads=reloads[0],
+               parts={k: dict(n=len(v), mean=round(sum(v) / len(v), 3), p50=round(sorted(v)[len(v) // 2], 3), max=round(max(v), 3)) for k, v in parts.items() if v})
     print(json.dumps(out), flush=True)
     os._exit(0)
 
