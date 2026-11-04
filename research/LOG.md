@@ -616,8 +616,41 @@ Two problems came up on the way. Both affect anyone who runs many vLLM processes
 
 Spend: credit went from 6.39 to 5.16, so $1.23 for the round, against the approved cap of $1.5. The instance is destroyed.
 
+## Result 38: isolated replicas of one model, with private weights or one shared segment (measured, `results/h37/`)
+
+The setup is vLLM 0.8.5 with the V0 engine, Qwen2.5-1.5B in bf16, one A100 40 GB, and `OMP_NUM_THREADS=2`. Each replica is its own vLLM process and its own CUDA context. In the shared runs, every replica maps the same segment, so the device holds one copy of the weights. The serve runs use the Result 33 trace at twice the speed: 1481 requests in 300 s. Request j goes to the j-th live replica in turn.
+
+How many replicas fit at idle, with `gpu_memory_utilization` 0.12. Each run starts replicas until one fails:
+
+| | device memory per replica | fit | same output in every replica |
+|---|---|---|---|
+| private weights | 3.91 GiB | 9 | yes |
+| one shared segment | 0.94 GiB, plus 3.28 GiB for the broker | 34 | yes |
+
+Serving the same trace:
+
+| | replicas | device memory mean | tokens per second | latency p50, p99 |
+|---|---|---|---|---|
+| one process, no isolation, utilization 0.85 | 1 | 33.0 GiB | 741.2 | 6.7, 9.6 s |
+| private weights | 7 | 28.9 GiB | 724.2 | 16.7, 25.5 s |
+| shared segment | 7 | 10.6 GiB | 736.1 | 15.7, 23.1 s |
+| shared segment, freed memory given to KV, utilization 0.19 | 7 | 30.7 GiB | 724.0 | 16.6, 23.7 s |
+| shared segment | 15 | 19.8 GiB | 697.2 | 35.2, 48.7 s |
+
+The fault: at 150 s in the shared run with 7 replicas, replica 0 wrote into its weights. It got "an illegal memory access" and exited. The other six replicas had no failed requests, and they gave the same output after the run as before.
+
+- With one shared copy, an isolated replica costs 0.94 GiB instead of 3.91 GiB. Four times as many isolated replicas fit at idle: 34 against 9.
+- At the same number of replicas, sharing gives the same service with 37% of the device memory: 10.6 GiB against 28.9 GiB.
+- This trace is compute-bound. More KV memory did not raise throughput, and neither did more replicas. Fifteen replicas time-slice the GPU and double the latency. So the freed memory is useful for more tenants, or for other work on the GPU. It does not make one model serve faster.
+- Isolation costs latency on this trace. One unisolated process has a p50 of 6.7 s, against about 16 s for 7 isolated replicas, at the same throughput. Each replica sees only a seventh of the requests, so its batches are smaller. MPS or a shared process recovers this, but it gives up the separate fault domain.
+- vLLM sleep mode cannot give this result. It saves memory only for a process that sleeps. A replica that serves holds its own copy of the weights.
+- The first shared run with 15 replicas is invalid. The fault message and a request used one pipe at the same time, 8 requests never completed, and the run waited for its time limit. The harness now sends the fault through the replica's own request queue. Its row is in `h37_serve-shared_race.jsonl` for the record only.
+
+Spend: credit went from 5.16 to 4.65, so $0.51, against the approved cap of $1.5. The instance is destroyed.
+
 ## Process lessons
 
+- Measure capacity under load, not at idle. An idle replica held 0.94 GiB, and under load it needed about 1.4 GiB more for activations.
 - Run the strongest existing baseline before you claim a gain. vLLM's sleep mode removed most of the latency case for segments.
 - When the same index fails in every mode, look for a counted resource. The tenth process failed on threads, not on CUDA.
 - Look at what is still alive before you explain a number. The 462 MiB was a Python loop variable, not CUDA state.

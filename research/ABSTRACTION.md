@@ -51,6 +51,8 @@ vLLM's own sleep mode gets the same latency on the same trace: p50 11.9 s agains
 
 The sharing is the part that this trace does not test.
 
+Result 38 tests the sharing. Each replica of one model is its own vLLM process and its own context, so the replicas are isolated. With one shared segment, a replica costs 0.94 GiB instead of 3.91 GiB, and 34 replicas fit at idle against 9. Seven replicas serve a trace at the same throughput with 10.6 GiB instead of 28.9 GiB. A replica that writes into the shared weights faults alone, and the others keep their output. On this compute-bound trace, the freed memory does not make the model faster. It makes room for more tenants. One unisolated process still has 2.4 times lower latency than seven isolated replicas, at the same throughput.
+
 Segments cross trust boundaries. Two containers, another uid, a user namespace, no capabilities, and an exited owner all work with the unmodified driver. A gVisor sandbox works with a 9-line nvproxy change, and real kernels there give the same output with fault isolation (Results 23 to 25).
 
 ## Where it sits against warmd
