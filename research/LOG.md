@@ -559,8 +559,40 @@ The fix comes from Result 34. At park, the harness now drops only the GPU KV ten
 
 Spend: credit went from 7.18 to 6.90, so $0.28. The round total is $0.78, against the approved cap of $1.5. The instance is destroyed.
 
+## Result 36: what a parked vLLM process holds, and a leaked embedding (measured, `results/h35/`)
+
+The setup is the same host and trace as in Result 35. A probe parks one vLLM process. It reads the PyTorch allocator, lists the CUDA tensors that are still alive, and measures how much device memory a checkpoint frees. Then it restores and resumes the process, and it checks that a greedy request gives the same tokens as before.
+
+| parked process | before the fix | after the fix |
+|---|---|---|
+| PyTorch allocated, reserved | 462, 488 MiB | 16, 42 MiB |
+| device memory a checkpoint frees | 1005 MiB | 559 MiB |
+| checkpoint, restore | 0.82, 0.62 s | 0.55, 0.59 s |
+| same output after resume | yes | yes |
+
+- A parked process kept an unnamed copy of the embedding: [151936, 1536] bf16, 445 MiB. The cause was in the harness. After the loop over the parameters, the loop variable still pointed at the last original parameter. The model ties `lm_head` to the embedding, so that parameter was the embedding. A `del` fixes it. Every process, active or parked, had held this copy.
+- Clearing the cuBLAS workspaces at park frees only about 20 MiB and does not change the restore time.
+- After the fix, a parked process holds 559 MiB, close to the 427 MiB of a bare context on this GPU. The restore of 0.5 to 0.6 s is now mostly a fixed cost: copying 559 MiB at PCIe speed takes about 0.05 s. A restore cannot go much lower with cuda-checkpoint.
+
+The Result 35 run again, with the fix:
+
+| | seg, Result 35 | seg, fixed | plain, 7 engines, Result 34 |
+|---|---|---|---|
+| tokens per second | 376.2 | 376.2 | 266.2 |
+| latency p50, p90, p99 | 15, 69, 101 s | 15, 78, 103 s | 148, 297, 429 s |
+| mean wake | 0.96 s | 0.78 s | cold start 18.4 s |
+| restore, segment map | 0.71, 0.23 s | 0.56, 0.23 s | |
+| checkpoint, off the request path | 0.87 s | 0.59 s | |
+| device memory mean, max | 27.1, 29.6 GiB | 24.1, 25.4 GiB | 25.6, 29.8 GiB |
+
+- seg now uses less device memory than plain with 7 engines, and its p50 is 10 times lower and its p99 4.2 times lower. The comparison in Result 33 understated seg: part of its extra memory was this leak.
+- A larger budget of 24 GiB cut reloads from 127 to 95 of 127 wakes, and the mean map from 0.23 to 0.17 s. It cost 5.9 GiB of device memory. That is not a good trade here.
+
+Spend: credit went from 6.90 to 6.39, so $0.51. The instance is destroyed.
+
 ## Process lessons
 
+- Look at what is still alive before you explain a number. The 462 MiB was a Python loop variable, not CUDA state.
 - Time each part of a slow step before you guess. I predicted that the restore dominated the wake. The KV rebuild did, and the fix was four lines.
 - Rent a host that already has the image cached. A host that ran the image before starts in under a minute. A new host can take more than an hour.
 

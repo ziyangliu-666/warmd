@@ -1,15 +1,20 @@
 #!/usr/bin/env bash
-# GPU experiments for H3 and H5, run serially so that timings do not interfere.
-cd /workspace/exp; R=results; W=/workspace/warmd; SOCK=/tmp/warmd-exp/gpu0.sock
-python3 -c 'import triton; print(triton.__version__)'
-for m in overhead ipc fault; do python3 h3.py $m native 2>>$R/h3.err; done | tee $R/h3.jsonl
-python3 h3.py wild native 2>>$R/h3.err | tee -a $R/h3.jsonl
-python3 h3.py conc native 2>>$R/h3.err | tee -a $R/h3.jsonl
-$W/build/warmd --socket $SOCK --sessions 64 --standbys 1 > $R/warmd_h3.log 2>&1 & HP=$!
-for i in $(seq 100); do grep -q ACTIVE $R/warmd_h3.log && break; sleep 0.1; done
-export WARMD_SOCKET=$SOCK
-LD_LIBRARY_PATH=$W/build/lib python3 h3.py wild warmd 2>>$R/h3.err | tee -a $R/h3.jsonl
-sleep 2
-LD_LIBRARY_PATH=$W/build/lib python3 h3.py conc warmd 2>>$R/h3.err | tee -a $R/h3.jsonl
-kill $HP; sleep 2
-gcc -O2 h5.c -o h5 -I/usr/local/cuda/include -lcuda -lpthread 2>&1 | tail -3; ./h5 | tee $R/h5.jsonl
+# H35: what a parked vLLM process holds, then the Result 35 run with cuBLAS cleared, and with a larger budget.
+cd /workspace; R=/workspace/results; mkdir -p $R exp
+pip install -q "vllm==0.6.6" safetensors 2>&1 | grep -v -i "warn\|notice" | tail -1
+pip install -q --force-reinstall --no-deps "transformers==4.47.1" "tokenizers==0.21.0" "huggingface-hub==0.36.2" 2>&1 | grep -v -i "warn\|notice" | tail -1
+python3 -c 'from huggingface_hub import snapshot_download as s; print(s("Qwen/Qwen2.5-1.5B-Instruct", local_dir="/workspace/qwen15", allow_patterns=["*.json","*.safetensors","*.txt"]))' 2>&1 | tail -1
+cd /workspace/warmd && make -s build/lib/libwarmd_segment.so && python3 tests/segment_tests.py 2>&1 | tail -1
+curl -sSL -m 60 -o /workspace/exp/cuda-checkpoint https://github.com/NVIDIA/cuda-checkpoint/raw/main/bin/x86_64_Linux/cuda-checkpoint; chmod +x /workspace/exp/cuda-checkpoint
+cd /workspace/exp; export F=/dev/shm/qwen15_vllm.safetensors SWAP=2
+nvidia-smi --query-gpu=name,driver_version,memory.used --format=csv,noheader | tee $R/h35_env.txt
+echo setup-done
+clean() { ps -eo pid,args | grep -E "[w]armd.segments|[s]pawn_main|[p]ython3 h34.py" | awk '{print $1}' | xargs -r kill -9; sleep 5; rm -f $F.done; }
+clean; timeout 900 python3 h34.py probe /workspace/exp/h34_trace.json 600 > $R/h35_probe.out 2> $R/h35_probe.err
+grep '^{' $R/h35_probe.out | tee $R/h35_probe.jsonl
+for run in "1 18" "1 24"; do set -- $run; clean; n=h35_clear$1_budget$2
+  CLEAR=$1 BUDGET_GIB=$2 HIB_AFTER=2 ACTIVE=6 timeout 2400 python3 h34.py seg /workspace/exp/h34_trace.json 600 > $R/$n.out 2> $R/$n.err
+  grep "^{" $R/$n.out | tail -1 | tee -a $R/h35.jsonl
+  grep -E "Error|Traceback|had exited" $R/$n.err | grep -v EOFError | tail -n 3 | cut -c1-200
+done
+echo h35-done

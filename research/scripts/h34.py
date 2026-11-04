@@ -22,6 +22,7 @@ UTIL = float(os.environ.get("UTIL", "0.12"))
 Q = "/workspace/qwen15"; SOCK = "/tmp/seg.sock"
 F = os.environ.get("F", "/workspace/qwen15_vllm.safetensors")   # the segment file; /dev/shm avoids a slow disk
 SWAP = float(os.environ.get("SWAP", "4"))                       # vLLM CPU swap space per process, GiB, pinned
+CLEAR = os.environ.get("CLEAR", "0") == "1"         # park also frees the cuBLAS workspaces
 KEEP_CPU = os.environ.get("KEEP_CPU", "1") == "1"   # park drops only the GPU KV pool; the pinned CPU swap space stays
 TOOL = "/workspace/exp/cuda-checkpoint"; ROOT = "/workspace/warmd"
 
@@ -34,7 +35,7 @@ def worker(i, mode, conn):
     llm = LLM(model=Q, gpu_memory_utilization=UTIL, enforce_eager=True, max_model_len=2048, seed=0, dtype="bfloat16", disable_log_stats=True, swap_space=SWAP)
     w = llm.llm_engine.model_executor.driver_worker
     c = None
-    if mode == "seg":
+    if mode in ("seg", "probe"):
         sys.path.insert(0, os.path.join(ROOT, "python"))
         from warmd.segments import Client
         m = w.model_runner.model
@@ -52,7 +53,9 @@ def worker(i, mode, conn):
         for k in names:
             mod, _, leaf = k.rpartition(".")
             m.get_submodule(mod)._parameters[leaf] = torch.nn.Parameter(sd[alias[k]], requires_grad=False)
-        del names, first
+        # p is the loop variable above. It still points at the last original parameter, which for a model
+        # with tied embeddings is the 445 MiB embedding: without this del, every process kept a private copy.
+        del names, first, p
         gc.collect(); torch.cuda.empty_cache()
     conn.send(("ready", time.perf_counter() - t0))
     while True:
@@ -71,7 +74,43 @@ def worker(i, mode, conn):
             else:
                 w.cache_engine = None
             w.gpu_cache = None
-            gc.collect(); torch.cuda.synchronize(); torch.cuda.empty_cache(); conn.send(("parked",))
+            gc.collect(); torch.cuda.synchronize()
+            if CLEAR or (len(msg) > 1 and msg[1]):
+                torch._C._cuda_clearCublasWorkspaces()
+            torch.cuda.empty_cache()
+            conn.send(("parked", torch.cuda.memory_allocated() >> 20, torch.cuda.memory_reserved() >> 20))
+        elif msg[0] == "tensors":                # the largest CUDA tensors still alive, and who names them
+            m = w.model_runner.model
+            named = {}
+            for k, v in list(m.named_parameters(remove_duplicate=False)) + list(m.named_buffers(remove_duplicate=False)):
+                named.setdefault(v.data_ptr(), k)
+            found = {}
+            for o in gc.get_objects():
+                try:
+                    if torch.is_tensor(o) and o.is_cuda and o.untyped_storage().nbytes() > (8 << 20):
+                        st = o.untyped_storage()
+                        found[st.data_ptr()] = (st.nbytes() >> 20, tuple(o.shape), str(o.dtype), named.get(o.data_ptr(), "?"))
+                except Exception:
+                    pass
+            holders = []                         # who keeps an unnamed large tensor alive
+            for o in (gc.get_objects() if os.environ.get("HOLDERS") == "1" else []):   # slow: a heap scan per tensor
+                try:
+                    if torch.is_tensor(o) and o.is_cuda and o.untyped_storage().nbytes() > (256 << 20) and o.data_ptr() not in named:
+                        for r in gc.get_referrers(o):
+                            if r is found or isinstance(r, list) and len(r) > 1000:
+                                continue
+                            d = type(r).__name__
+                            if isinstance(r, dict):
+                                keys = [k for k, v in r.items() if v is o][:3]
+                                owners = [type(x).__name__ for x in gc.get_referrers(r) if hasattr(x, "__dict__") and getattr(x, "__dict__", None) is r][:3]
+                                d += f" keys={keys} owners={owners}"
+                            holders.append(d)
+                except Exception:
+                    pass
+            conn.send(("tensors", sorted(found.values(), reverse=True)[:3], holders[:12]))
+        elif msg[0] == "check":                  # one short greedy request, to show the model still works
+            o = llm.generate([{"prompt_token_ids": [9707, 11, 1879, 0]}], SamplingParams(max_tokens=8, temperature=0), use_tqdm=False)
+            conn.send(("checked", list(o[0].outputs[0].token_ids)))
         elif msg[0] == "resume":
             t0 = time.perf_counter(); reloaded = c.resume(f"m{i}")
             t1 = time.perf_counter()
@@ -138,6 +177,26 @@ def main():
         pipes[i].send(msg)
         return pipes[i].recv()
 
+    if mode == "probe":
+        # What a parked vLLM process still holds on the device, and what a checkpoint and restore of it cost.
+        # Models alternate: odd ones also free the cuBLAS workspaces at park.
+        broker = start_broker()
+        for i in range(int(os.environ.get("PROBES", "4"))):
+            spawn(i)
+            ref = call(i, "check")[1]
+            r = call(i, "park", i % 2 == 1)
+            r2 = call(i, "tensors")
+            print(json.dumps(dict(probe=i, alive_after_park=r2[1], holders=r2[2])), flush=True)
+            time.sleep(1); before = used_mib()
+            t = time.perf_counter(); toggle(i); t_ckpt = time.perf_counter() - t
+            time.sleep(1); after = used_mib()
+            t = time.perf_counter(); toggle(i); t_restore = time.perf_counter() - t
+            call(i, "resume")
+            same = call(i, "check")[1] == ref
+            print(json.dumps(dict(probe=i, clear=i % 2 == 1, torch_allocated_mib=r[1], torch_reserved_mib=r[2],
+                                  device_freed_by_checkpoint_mib=before - after, checkpoint_s=round(t_ckpt, 3),
+                                  restore_s=round(t_restore, 3), same_output=same)), flush=True)
+        os._exit(0)
     if mode == "seg":
         broker = start_broker()
         # Start one at a time: vLLM sizes its pool from free memory. Start the idle models first,
@@ -277,7 +336,7 @@ def main():
                wakes=stats["wakes"], wake_mean_s=round(sum(stats["wake_s"]) / max(1, len(stats["wake_s"])), 3), restores=stats["restores"],
                colds=stats["colds"], cold_mean_s=round(sum(stats["cold_s"]) / max(1, len(stats["cold_s"])), 1),
                setup_used_mib=setup_used, used_mean_mib=round(sum(samples) / max(1, len(samples))), used_max_mib=max(samples or [0]), broker_killed=killed, dead_engines=stats.get("dead", 0),
-               hib_after=HIB_AFTER, swap_gib=SWAP, keep_cpu=KEEP_CPU, budget_gib=BUDGET_GIB, reloads=reloads[0],
+               hib_after=HIB_AFTER, swap_gib=SWAP, keep_cpu=KEEP_CPU, clear=CLEAR, budget_gib=BUDGET_GIB, reloads=reloads[0],
                parts={k: dict(n=len(v), mean=round(sum(v) / len(v), 3), p50=round(sorted(v)[len(v) // 2], 3), max=round(max(v), 3)) for k, v in parts.items() if v})
     print(json.dumps(out), flush=True)
     os._exit(0)
