@@ -249,6 +249,34 @@ class BrokerTests(unittest.TestCase):
         self.assertEqual((reply["ok"], fd), (False, None))
         self.assertEqual((sorted(b.loaded), b.pending), (["a"], {}))
 
+    def test_usage_splits_a_shared_segment_between_uids(self):
+        files = {n: os.path.join(self.dir, f"{n}.safetensors") for n in "ab"}
+        for p in files.values():
+            write_safetensors(p, {"w": ("U8", [8], bytes(8))})
+        b = S.Broker(files, self.dev, allow_uids=[self.me, 4242])
+        size = 2 << 20
+        c1, c2, c3 = b.new_connection(self.me), b.new_connection(4242), b.new_connection(4242)
+        b.request(self.me, {"op": "open", "name": "a"}, c1)
+        b.request(4242, {"op": "open", "name": "a"}, c2)
+        b.request(4242, {"op": "open", "name": "b"}, c3)
+        u = b.usage()
+        self.assertEqual(u[self.me]["charged_bytes"], size // 2)
+        self.assertEqual(u[4242]["charged_bytes"], size // 2 + size)
+        b.end_connection(c2)                           # a tenant that exits stops paying for a
+        self.assertEqual(b.usage()[self.me]["charged_bytes"], size)
+        b.request(self.me, {"op": "release", "name": "a"}, c1)
+        self.assertNotIn(self.me, b.usage())           # loaded but unmapped: charged to nobody
+        self.assertEqual(b.usage(4242), {4242: dict(segments={"b": 1}, charged_bytes=size)})
+
+    def test_usage_op_shows_others_only_to_admin(self):
+        c = self.b.new_connection(4242)
+        self.b.request(4242, {"op": "open", "name": "m"}, c)
+        mine = self.b.request(4242, {"op": "usage"})[0]["usage"]
+        everyone = self.b.request(self.me, {"op": "usage"})[0]["usage"]
+        self.assertEqual(list(mine), ["4242"])
+        self.assertIn("4242", everyone)
+        self.assertEqual(self.b.request(self.me, {"op": "usage"}, self.b.new_connection(self.me))[0]["ok"], True)
+
     @unittest.skipUnless(hasattr(socket, "SO_PEERCRED"), "SO_PEERCRED is Linux only")
     def test_served_over_a_socket(self):
         path = os.path.join(self.dir, "s.sock")

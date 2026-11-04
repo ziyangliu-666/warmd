@@ -224,6 +224,7 @@ class Broker:
         self.loaded = {}         # name -> dict(handle, fd, size, layout, generation)
         self.generation = {}
         self.mapped = {}         # name -> number of clients that map the loaded generation
+        self.by_uid = {}         # name -> {uid: mappings}, for per-tenant accounting
         self.budget = budget
         self.used_at = {}        # name -> counter value at last open or release, for LRU
         self.clock = 0
@@ -260,6 +261,7 @@ class Broker:
                             if v is not None and not self.mapped.get(victim):
                                 del self.loaded[victim]
                                 self.mapped.pop(victim, None)
+                                self.by_uid.pop(victim, None)
                                 self.device.release(v["handle"], v["fd"])
                                 break
                     finally:
@@ -267,15 +269,41 @@ class Broker:
             else:
                 return False
 
-    def new_connection(self):
-        return {}                # name -> times this connection mapped the loaded generation
+    def new_connection(self, uid=None):
+        # name -> times this connection mapped the loaded generation. The key None holds the peer uid.
+        return {None: uid}
+
+    def _count(self, name, uid, delta):
+        """Called with self.lock held. Keeps self.mapped and self.by_uid in step."""
+        self.mapped[name] = max(0, self.mapped.get(name, 0) + delta)
+        users = self.by_uid.setdefault(name, {})
+        users[uid] = users.get(uid, 0) + delta
+        if users[uid] <= 0:
+            del users[uid]
 
     def end_connection(self, conn):
         with self.lock:
+            uid = conn.get(None)
             for name, n in conn.items():
-                if name in self.mapped:
-                    self.mapped[name] = max(0, self.mapped[name] - n)
+                if name is not None and name in self.mapped:
+                    self._count(name, uid, -n)
             conn.clear()
+
+    def usage(self, uid=None):
+        """Device memory charged to each uid. A loaded segment is split equally between the uids that
+        map it, so tenants that share one copy of a model each pay a fraction of it. A segment that is
+        loaded but not mapped is charged to nobody: the broker may evict it. uid=None returns every uid."""
+        out = {}
+        with self.lock:
+            for name, s in self.loaded.items():
+                users = self.by_uid.get(name, {})
+                for u, n in users.items():
+                    if uid is not None and u != uid:
+                        continue
+                    e = out.setdefault(u, dict(segments={}, charged_bytes=0))
+                    e["segments"][name] = n
+                    e["charged_bytes"] += s["size"] // len(users)
+        return out
 
     def request(self, uid, req, conn=None):
         """Handle one request. Return (reply, fd or None). Client errors become replies.
@@ -283,13 +311,18 @@ class Broker:
         conn is the per-connection state from new_connection(). It counts mappings, so that
         evict can refuse while a client still maps a segment: a reload then would hold two copies.
         """
-        conn = {} if conn is None else conn
+        conn = {None: uid} if conn is None else conn
+        if conn.get(None) is None:
+            conn[None] = uid                 # one connection, one peer: end_connection uncounts this uid
         op, name = req.get("op"), req.get("name")
         if uid not in self.allow:
             return dict(ok=False, error="permission denied"), None
         if op == "list":
             with self.lock:
                 return dict(ok=True, segments={n: dict(loaded=n in self.loaded, mapped=self.mapped.get(n, 0)) for n in self.files}), None
+        if op == "usage":                     # an admin sees every uid; others see their own
+            u = self.usage(None if uid in self.admin else uid)
+            return dict(ok=True, usage={str(k): v for k, v in u.items()}), None
         if not isinstance(name, str) or name not in self.files:
             return dict(ok=False, error="unknown segment"), None
         if op == "open":
@@ -312,8 +345,9 @@ class Broker:
                         self.generation[name] = self.generation.get(name, 0) + 1
                         s = self.loaded[name] = dict(handle=handle, fd=fd, size=size, layout=layout, generation=self.generation[name])
                         self.mapped[name] = 0
+                        self.by_uid[name] = {}
                 with self.lock:
-                    self.mapped[name] += 1
+                    self._count(name, uid, 1)
                     conn[name] = conn.get(name, 0) + 1
                     self._touch(name)
                 public = {k: {f: v[f] for f in ("dtype", "shape", "offset", "nbytes")} for k, v in s["layout"].items()}
@@ -322,7 +356,7 @@ class Broker:
             with self.lock:
                 if conn.get(name, 0) > 0:
                     conn[name] -= 1
-                    self.mapped[name] = max(0, self.mapped.get(name, 0) - 1)
+                    self._count(name, uid, -1)
                     self._touch(name)
             return dict(ok=True), None
         if op == "evict":
@@ -334,6 +368,7 @@ class Broker:
                     return dict(ok=False, error=f"{users} clients still map {name}; park them first or pass force"), None
                 s = self.loaded.pop(name, None)
                 self.mapped.pop(name, None)
+                self.by_uid.pop(name, None)
                 if s is not None:
                     self.device.release(s["handle"], s["fd"])
             return dict(ok=True, evicted=s is not None), None
@@ -344,7 +379,7 @@ class Broker:
             creds = conn.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, struct.calcsize("3i"))
             _, uid, _ = struct.unpack("3i", creds)
             self.device.bind()
-            buffer, state = bytearray(), self.new_connection()
+            buffer, state = bytearray(), self.new_connection(uid)
             try:
                 while True:
                     req, stray = recv_message(conn, buffer)
@@ -511,6 +546,10 @@ class Client:
 
     def list(self):
         return self._call(op="list")[0]["segments"]
+
+    def usage(self):
+        """Device memory charged to each uid, as {uid: {segments, charged_bytes}}. See Broker.usage."""
+        return self._call(op="usage")[0]["usage"]
 
     def evict(self, name, force=False):
         """Ask the broker to drop its copy. Needs the broker's uid or root. Refused while any

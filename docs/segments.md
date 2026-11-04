@@ -39,6 +39,10 @@ To free the context's device memory too (about 500 MiB for a PyTorch process on 
 
 `--budget-gib 30` caps the device memory of all segments. To load a new one past the cap, the broker evicts the least recently used segments that no client maps. If every loaded segment is mapped, the open fails.
 
+## Accounting
+
+`Client.usage()` returns the device memory that the broker charges to each uid. A segment that several uids map is split equally between them. Tenants that share one copy of a model therefore each pay a fraction of it. A segment that is loaded but not mapped is charged to nobody, because the broker may evict it. The broker's uid and root see every uid; other clients see only their own. A scheduler can add this charge to the memory that a tenant's own contexts use.
+
 ## Broker restart
 
 Mappings survive a broker crash: clients keep running on the memory they map. A client reconnects on its next call. After a restart, `resume` loads a fresh copy and returns True; the old copy is freed when the last client parks.
