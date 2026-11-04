@@ -648,6 +648,23 @@ The fault: at 150 s in the shared run with 7 replicas, replica 0 wrote into its 
 
 Spend: credit went from 5.16 to 4.65, so $0.51, against the approved cap of $1.5. The instance is destroyed.
 
+## Result 39: GPUs needed for isolated tenants, with private weights or shared segments (computed, `scripts/placement_sim.py`, `results/placement_sim.jsonl`)
+
+Each tenant runs one isolated replica of one model. Popularity across models follows Zipf with exponent 1. The memory costs come from Result 38. A replica under load also needs 1.4 GiB of activation peak. The private rule is first fit. The shared rule puts a tenant on a GPU that already holds its model's segment, and otherwise on the GPU with the most free memory. The simulation counts memory only.
+
+| models, tenants | GPUs, private | GPUs, shared, under load | saving under load | saving at idle footprint |
+|---|---|---|---|---|
+| 1, 1024 | 147 | 69 | 2.13 | 3.81 |
+| 16, 1024 | 147 | 70 | 2.10 | 3.55 |
+| 64, 1024 | 147 | 78 | 1.88 | 3.03 |
+| 256, 1024 | 147 | 92 | 1.60 | 2.10 |
+| 256, 64 | 10 | 8 | 1.25 | 1.40 |
+
+- Under load, the saving is about 2 times. The 1.4 GiB activation peak is larger than the 0.94 GiB idle replica, so it dominates once the weights are shared. A smaller `max_num_batched_tokens` would shrink the peak, at some cost in prefill speed. This was not measured.
+- At the idle footprint, the saving rises to 3 to 4 times when many tenants share few models. That is the case that matters if most tenants are idle and a scheduler admits replicas by their idle footprint. Such a scheduler then needs park and hibernate for the replicas that wake.
+- With many distinct models and few tenants each, the saving falls toward 1. Each model needs its own segment, and there is little to share.
+- This is a model. It ignores compute, which Result 38 shows to be the limit on a busy GPU, and it ignores fragmentation over time.
+
 ## Process lessons
 
 - Measure capacity under load, not at idle. An idle replica held 0.94 GiB, and under load it needed about 1.4 GiB more for activations.
