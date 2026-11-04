@@ -97,7 +97,7 @@ The exact combination did not appear in two searches, which is weak evidence. Cl
 
 1. Test the part that sleep mode cannot do: many tenants of one model in separate processes or sandboxes, sharing one copy of the weights. Measure how many active replicas fit on one GPU with segments and with sleep mode, and the cost of a fault in one of them. Also test sleep mode with cuda-checkpoint, which may close the memory gap. A zygote fork does not beat the 0.56 s restore for vLLM, because engine set-up alone takes 6.8 s. Done so far: the comparison with vLLM sleep mode (Result 37), the many-model run (Result 33), the wake split and an equal-memory rerun (Result 34), the KV fix (Result 35), the parked footprint (Result 36), and broker restart with reconnect.
 2. Compare with one vLLM process that serves many LoRA adapters on the same trace. This applies only when the models share a base.
-3. Add per-tenant memory accounting, and expose segments to the scheduler.
+3. Expose segments to a scheduler. Per-tenant accounting is done: `Client.usage()` splits a shared segment between the uids that map it. A scheduler still has to place tenants by it and add the memory of their contexts.
 4. Support models sharded over several GPUs.
 5. The nvproxy change is offered to gVisor as pull request 16898.
 
