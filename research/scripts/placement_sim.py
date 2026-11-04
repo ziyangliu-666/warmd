@@ -3,10 +3,8 @@
     python3 placement_sim.py
 
 Each tenant runs one isolated replica of one model. The memory costs are from Result 38
-(Qwen2.5-1.5B, vLLM 0.8.5, A100 40 GB, gpu_memory_utilization 0.12), with the activation peak under load:
-- private: 3.91 GiB at idle + 1.4 GiB peak = 5.31 GiB per replica
-- shared:  0.94 GiB at idle + 1.4 GiB peak = 2.34 GiB per replica, plus once per (GPU, model) the
-           segment (2.89 GiB) and, once per GPU, the broker context (0.39 GiB)
+and Result 40 (Qwen2.5-1.5B, vLLM 0.8.5, A100 40 GB, gpu_memory_utilization 0.12); see the constants.
+A shared replica also needs, once per (GPU, model), the segment, and once per GPU, the broker context.
 
 Two placement rules:
 - private first fit: put each tenant on the first GPU with room.
@@ -18,9 +16,13 @@ busy trace, so the numbers apply to tenants that are mostly idle, as in Results 
 import json, os, random
 
 GPU = 39.5
-PEAK = 0.0 if os.environ.get("IDLE") == "1" else 1.4     # IDLE=1: replicas at their idle footprint
-PRIVATE = 3.91 + PEAK
-SHARED_REPLICA, SEGMENT, BROKER = 0.94 + PEAK, 2.89, 0.39
+IDLE = os.environ.get("IDLE") == "1"
+# Device memory per replica in GiB. Idle: after start-up (Result 38). Under load: the mean while seven
+# replicas serve the Result 38 trace (Result 40). Result 39 first assumed a 1.4 GiB activation peak under
+# load, taken from vLLM's start-up profile. Measured, the extra under load is 0.2 GiB.
+PRIVATE = 3.91 if IDLE else 4.12
+SHARED_REPLICA = 0.94 if IDLE else 1.12
+SEGMENT, BROKER = 2.89, 0.42
 
 
 def tenants(n, models, zipf, seed=0):
@@ -61,7 +63,7 @@ def main():
         for n in (64, 256, 1024):
             ts = tenants(n, models, zipf=1.0)
             p, s = private(ts), shared(ts)
-            rows.append(dict(idle=PEAK == 0, tenants=n, models=models, distinct_models_used=len(set(ts)),
+            rows.append(dict(idle=IDLE, tenants=n, models=models, distinct_models_used=len(set(ts)),
                              gpus_private=p, gpus_shared=s, saving=round(p / s, 2)))
             print(json.dumps(rows[-1]))
 

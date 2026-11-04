@@ -19,6 +19,7 @@ R = int(os.environ.get("R", "6"))
 SPEED = float(os.environ.get("SPEED", "1"))             # trace time is divided by this
 FAULT_AT = float(os.environ.get("FAULT_AT", "1e9"))
 SWAP = float(os.environ.get("SWAP", "2"))
+MAXBT = int(os.environ.get("MAXBT", "2048"))           # max_num_batched_tokens; below 2048 needs chunked prefill
 Q = "/workspace/qwen15"; SOCK = "/tmp/seg.sock"; ROOT = "/workspace/warmd"
 F = os.environ.get("F", "/dev/shm/qwen15_vllm.safetensors")
 CHECK = [9707, 11, 1879, 0]
@@ -35,7 +36,8 @@ def worker(i, util, shared, conn):
         pass
     try:
         llm = LLM(model=Q, gpu_memory_utilization=util, enforce_eager=True, max_model_len=2048, seed=0,
-                  dtype="bfloat16", disable_log_stats=True, swap_space=SWAP)
+                  dtype="bfloat16", disable_log_stats=True, swap_space=SWAP,
+                  max_num_batched_tokens=MAXBT, enable_chunked_prefill=MAXBT < 2048)
     except Exception as e:
         conn.send(("failed", repr(e)[:300])); return
     w = llm.llm_engine.model_executor.driver_worker
@@ -71,7 +73,7 @@ def worker(i, util, shared, conn):
             outs = llm.generate(prompts, params, use_tqdm=False)
             conn.send(("done", time.time(), sum(len(o.outputs[0].token_ids) for o in outs)))
         elif msg[0] == "check":
-            conn.send(("checked", answer()))
+            conn.send(("checked", answer(), torch.cuda.max_memory_reserved() >> 20))
         elif msg[0] == "fault":                             # a kernel store into the read-only weights
             try:
                 m.model.embed_tokens.weight.data.add_(1); torch.cuda.synchronize()
@@ -194,13 +196,18 @@ def main():
         qs[k].put((rid, at, [100 + (rid + j) % 30000 for j in range(c)], g))
     done.wait(secs * 3)
     wall = time.time() - start
-    same = {k: pipes[k].send(("check",)) or pipes[k].recv()[1] == refs[k] for k in range(n) if alive[k]}
+    same, peaks = {}, {}
+    for k in range(n):
+        if alive[k]:
+            pipes[k].send(("check",)); r = pipes[k].recv()
+            same[k], peaks[k] = r[1] == refs[k], r[2]
     lat.sort()
     pct = lambda p: round(lat[min(len(lat) - 1, int(len(lat) * p))], 2) if lat else None
     print(json.dumps(dict(mode=mode, replicas=n, util=UTIL_ONE if n == 1 else UTIL, speed=SPEED, requests=len(trace),
                           completed=len(lat), errors_by_replica=errors, tokens_per_s=round(tokens[0] / wall, 1),
                           p50_s=pct(.5), p90_s=pct(.9), p99_s=pct(.99), setup_used_mib=setup_used,
-                          used_mean_mib=round(sum(samples) / max(1, len(samples))), fault=fault,
+                          used_mean_mib=round(sum(samples) / max(1, len(samples))), used_max_mib=max(samples or [0]),
+                          max_num_batched_tokens=MAXBT, torch_peak_reserved_mib=peaks, fault=fault,
                           same_output_after=same)), flush=True)
     os._exit(0)
 

@@ -650,24 +650,51 @@ Spend: credit went from 5.16 to 4.65, so $0.51, against the approved cap of $1.5
 
 ## Result 39: GPUs needed for isolated tenants, with private weights or shared segments (computed, `scripts/placement_sim.py`, `results/placement_sim.jsonl`)
 
-Each tenant runs one isolated replica of one model. Popularity across models follows Zipf with exponent 1. The memory costs come from Result 38. A replica under load also needs 1.4 GiB of activation peak. The private rule is first fit. The shared rule puts a tenant on a GPU that already holds its model's segment, and otherwise on the GPU with the most free memory. The simulation counts memory only.
+Correction on 2026-11-04: the first version assumed that a replica under load needs a 1.4 GiB activation peak on top of its idle footprint. That figure came from vLLM's start-up profile. Result 40 measured the extra under load as about 0.2 GiB. The table below uses the measured costs. The first version reported a saving of about 2 times under load. That was wrong.
 
-| models, tenants | GPUs, private | GPUs, shared, under load | saving under load | saving at idle footprint |
+Each tenant runs one isolated replica of one model. Popularity across models follows Zipf with exponent 1. The per-replica costs, in GiB:
+
+| | idle | under load |
+|---|---|---|
+| private weights | 3.91 | 4.12 |
+| shared segment | 0.94 | 1.12 |
+
+A shared replica also needs the segment (2.89 GiB) once per GPU and model, and the broker context (0.42 GiB) once per GPU. The private rule is first fit. The shared rule puts a tenant on a GPU that already holds its model's segment, and otherwise on the GPU with the most free memory. The simulation counts memory only.
+
+| models, tenants | GPUs, private, under load | GPUs, shared, under load | saving under load | saving at idle |
 |---|---|---|---|---|
-| 1, 1024 | 147 | 69 | 2.13 | 3.81 |
-| 16, 1024 | 147 | 70 | 2.10 | 3.55 |
-| 64, 1024 | 147 | 78 | 1.88 | 3.03 |
-| 256, 1024 | 147 | 92 | 1.60 | 2.10 |
-| 256, 64 | 10 | 8 | 1.25 | 1.40 |
+| 1, 1024 | 114 | 32 | 3.56 | 3.81 |
+| 16, 1024 | 114 | 34 | 3.35 | 3.55 |
+| 64, 1024 | 114 | 40 | 2.85 | 3.03 |
+| 256, 1024 | 114 | 56 | 2.04 | 2.10 |
+| 256, 64 | 8 | 6 | 1.33 | 1.40 |
 
-- Under load, the saving is about 2 times. The 1.4 GiB activation peak is larger than the 0.94 GiB idle replica, so it dominates once the weights are shared. A smaller `max_num_batched_tokens` would shrink the peak, at some cost in prefill speed. This was not measured.
-- At the idle footprint, the saving rises to 3 to 4 times when many tenants share few models. That is the case that matters if most tenants are idle and a scheduler admits replicas by their idle footprint. Such a scheduler then needs park and hibernate for the replicas that wake.
+- When many tenants share few models, the saving is 3.4 to 3.6 times under load, and close to that at idle.
 - With many distinct models and few tenants each, the saving falls toward 1. Each model needs its own segment, and there is little to share.
 - This is a model. It ignores compute, which Result 38 shows to be the limit on a busy GPU, and it ignores fragmentation over time.
 
+## Result 40: device memory of a shared replica under load, against max_num_batched_tokens (measured, `results/h38/`)
+
+The setup is that of Result 38: seven shared replicas serve the same trace. Only `max_num_batched_tokens` changes. Values below 2048 use chunked prefill.
+
+| max_num_batched_tokens | device memory, max | per replica under load | tokens per second | p50, p99 |
+|---|---|---|---|---|
+| 2048 | 11.18 GiB | 1.12 GiB | 724.9 | 16.7, 25.3 s |
+| 512 | 10.18 GiB | 0.98 GiB | 726.3 | 17.1, 25.7 s |
+| 256 | 10.18 GiB | 0.98 GiB | 724.0 | 17.8, 26.9 s |
+
+The per-replica figure subtracts 3.31 GiB for the broker and the segment from the device total. All replicas gave the same output after the run as before.
+
+- Under load, a shared replica needs only about 0.2 GiB more than at idle. The 1.39 GiB "activation peak" in vLLM's log is the start-up profile at the full batch. The KV pool here holds about 8000 tokens, so real batches never reach that size. With a larger KV pool, the activations would grow.
+- A limit of 512 saves 0.14 GiB per replica, and it costs 2% in p50 and nothing in throughput. Below 512 there is no further saving.
+- With these numbers, about 32 isolated replicas fit under load at the default limit, and about 36 at 512. With private weights, 9 fit.
+- `torch.cuda.max_memory_reserved` in each replica read 4.5 GiB. That counter keeps the start-up peak, before the weights move into the segment, so it is not a measure of the steady state.
+
+Spend: credit went from 4.65 to 4.45, so $0.20, against the approved cap of $1. The instance is destroyed.
+
 ## Process lessons
 
-- Measure capacity under load, not at idle. An idle replica held 0.94 GiB, and under load it needed about 1.4 GiB more for activations.
+- Measure a number before you build a model on it. Result 39 first used a peak from a start-up log, and it halved the saving.
 - Run the strongest existing baseline before you claim a gain. vLLM's sleep mode removed most of the latency case for segments.
 - When the same index fails in every mode, look for a counted resource. The tenth process failed on threads, not on CUDA.
 - Look at what is still alive before you explain a number. The 462 MiB was a Python loop variable, not CUDA state.
