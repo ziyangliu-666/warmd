@@ -1,0 +1,3 @@
+seg threads 559
+sleep threads 506
+plain threads 221

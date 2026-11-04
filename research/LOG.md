@@ -590,8 +590,36 @@ The Result 35 run again, with the fix:
 
 Spend: credit went from 6.90 to 6.39, so $0.51. The instance is destroyed.
 
+## Result 37: segments against vLLM's own sleep mode (measured, `results/h36/`)
+
+All three runs used vLLM 0.8.5 with the V0 engine, transformers 4.51.3, and torch 2.6.0, on the same A100 host and trace as before. `OMP_NUM_THREADS=2` was set for all three (see below).
+- `seg`: the Result 36 configuration, ported to 0.8.5. In 0.8.5, KV tensors are also bound to the attention layers, so park unbinds them and resume binds them again. A probe confirmed that a parked process holds 16 MiB of PyTorch memory, and that the output is unchanged after resume.
+- `sleep`: 16 processes with `enable_sleep_mode=True`. An idle model calls `llm.sleep(level=1)`, which copies the weights to pinned host memory and discards the KV pool. A wake calls `llm.wake_up()`. There is no hibernation.
+- `plain`: 7 engines, as in Result 34.
+
+| | seg | vLLM sleep | plain, 7 engines |
+|---|---|---|---|
+| tokens per second | 375.9 | 376.2 | 286.7 |
+| latency p50, p90, p99 | 12.3, 42.6, 69.6 s | 11.9, 38.1, 61.8 s | 91.6, 175, 231 s |
+| mean wake | 0.80 s | 0.16 s | cold start 12.0 s |
+| device memory mean, max | 24.8, 26.2 GiB | 30.1, 30.8 GiB | 26.6, 30.4 GiB |
+
+- vLLM's sleep mode matches segments on latency. Its wake is 5 times faster, because a sleeping process keeps its context: there is no restore. The p50 and p99 are within run-to-run variation of seg.
+- seg uses 5.3 GiB less device memory, which is 18% of the total. Ten sleeping processes keep their contexts on the device. seg hibernates them, and pays about 0.56 s per wake for the restore.
+- The large gain over plain comes from keeping the processes alive and freeing only their device state. vLLM's sleep mode already does that. Segments are not needed for it.
+- What segments still add: they let several processes or sandboxes map one read-only copy of the same weights. They work with any engine, and they keep memory low through hibernation. This trace does not exercise the first point, because each model has its own segment. The host-side picture also differs: seg keeps one pinned copy for each distinct file, and sleep keeps one for each sleeping process. Here all 16 models are the same file, so seg needed 2.9 GB of host copies, against up to 46 GB for sleep.
+- Untested: sleep mode plus cuda-checkpoint. It would probably get the same memory saving as seg.
+
+Two problems came up on the way. Both affect anyone who runs many vLLM processes on one GPU:
+- Unmodified vLLM sleep mode crashed after 124 sleeps. `Worker.sleep` asserts that device-wide free memory grew. When another process allocates at the same moment, the difference is negative, and the assert kills the engine. It still does this on vLLM main today. It is reported upstream as issue 63057, with pull request 63089 open. The `sleep` row above drops this check and keeps the sleep itself.
+- The container allows 3840 threads (`pids.max`). With default thread pools, nine vLLM 0.8.5 processes nearly used them up, and the tenth failed at start. The symptoms looked unrelated: a SIGSEGV in vLLM's model inspection subprocess, a numpy import error, and "CUDA-capable device is busy". With `OMP_NUM_THREADS=2`, all 16 processes together used 559 threads. The setting also made plain cold starts faster, 12.0 s against 21.8 s.
+
+Spend: credit went from 6.39 to 5.16, so $1.23 for the round, against the approved cap of $1.5. The instance is destroyed.
+
 ## Process lessons
 
+- Run the strongest existing baseline before you claim a gain. vLLM's sleep mode removed most of the latency case for segments.
+- When the same index fails in every mode, look for a counted resource. The tenth process failed on threads, not on CUDA.
 - Look at what is still alive before you explain a number. The 462 MiB was a Python loop variable, not CUDA state.
 - Time each part of a slow step before you guess. I predicted that the restore dominated the wake. The KV rebuild did, and the fix was four lines.
 - Rent a host that already has the image cached. A host that ran the image before starts in under a minute. A new host can take more than an hour.

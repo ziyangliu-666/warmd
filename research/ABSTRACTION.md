@@ -44,6 +44,13 @@ On ten real minutes of arrivals, isolated processes on segments reach a p99 of 1
 
 On sixteen vLLM processes of Qwen2.5-1.5B on one A100, with at most six active and KV pools included, park and hibernate serve 1.45 times the tokens of stopping and cold-starting engines. The p99 latency falls from 424 s to 132 s on an overloaded trace. Killing the broker mid-run caused no errors. With less device memory than plain (24.1 GiB against 25.6 GiB), and with park keeping the host half of the KV pool, the p50 falls from 148 s to 15 s and the p99 from 429 s to 103 s. A wake is 0.78 s: a cuda-checkpoint restore of 0.56 s and a segment reload of 0.23 s. A parked process holds 559 MiB, close to a bare context, so the restore is near its floor (Results 33 to 36).
 
+vLLM's own sleep mode gets the same latency on the same trace: p50 11.9 s against 12.3 s. Its wake is 0.16 s, because a sleeping process keeps its context. It uses 5.3 GiB more device memory, 18% of the total (Result 37). So most of the gain over plain comes from one idea: keep the process alive, and free only its device state. That idea does not need segments. Segments add three things that sleep mode lacks:
+- one read-only copy of the weights, shared by many processes or sandboxes;
+- low device memory through hibernation;
+- independence from the engine.
+
+The sharing is the part that this trace does not test.
+
 Segments cross trust boundaries. Two containers, another uid, a user namespace, no capabilities, and an exited owner all work with the unmodified driver. A gVisor sandbox works with a 9-line nvproxy change, and real kernels there give the same output with fault isolation (Results 23 to 25).
 
 ## Where it sits against warmd
@@ -86,7 +93,7 @@ The exact combination did not appear in two searches, which is weak evidence. Cl
 
 ## Next experiments, in order
 
-1. Compare with vLLM's own sleep mode (vLLM 0.7 and later), which copies weights to host memory at sleep and back at wake. A segment replaces the copy with an unmap and a remap, and lets processes share one copy. If the gain holds, propose it upstream. A zygote fork does not beat the 0.56 s restore for vLLM, because engine set-up alone takes 6.8 s. Done so far: the many-model run (Result 33), the wake split and an equal-memory rerun (Result 34), the KV fix (Result 35), the parked footprint (Result 36), and broker restart with reconnect.
+1. Test the part that sleep mode cannot do: many tenants of one model in separate processes or sandboxes, sharing one copy of the weights. Measure how many active replicas fit on one GPU with segments and with sleep mode, and the cost of a fault in one of them. Also test sleep mode with cuda-checkpoint, which may close the memory gap. A zygote fork does not beat the 0.56 s restore for vLLM, because engine set-up alone takes 6.8 s. Done so far: the comparison with vLLM sleep mode (Result 37), the many-model run (Result 33), the wake split and an equal-memory rerun (Result 34), the KV fix (Result 35), the parked footprint (Result 36), and broker restart with reconnect.
 2. Compare with one vLLM process that serves many LoRA adapters on the same trace. This applies only when the models share a base.
 3. Add per-tenant memory accounting, and expose segments to the scheduler.
 4. Support models sharded over several GPUs.

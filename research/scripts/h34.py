@@ -31,9 +31,41 @@ def worker(i, mode, conn):
     os.environ["CUDA_DEVICE_MAX_CONNECTIONS"] = "1"
     import torch
     from vllm import LLM, SamplingParams
+    try:
+        # vLLM 0.8.5 inspects the model class in a fresh subprocess. On this host that subprocess died with
+        # SIGSEGV whenever nine vLLM processes were already alive, in every mode. Inspect in this process.
+        import vllm.model_executor.models.registry as reg
+        reg._run_in_subprocess = lambda fn: fn()
+    except (ImportError, AttributeError):
+        pass
+    if mode == "sleep":
+        # Worker.sleep asserts that device-wide free memory grew. With other processes on the same GPU,
+        # their allocations can make the difference negative, and the assert kills the engine. This is a
+        # measurement problem, not a failed sleep: keep the sleep itself and drop the check.
+        import vllm.worker.worker as vw
+        from vllm.device_allocator.cumem import CuMemAllocator
+
+        def _sleep(self, level=1):
+            CuMemAllocator.get_instance().sleep(offload_tags=("weights",) if level == 1 else tuple())
+        vw.Worker.sleep = _sleep
     t0 = time.perf_counter()
-    llm = LLM(model=Q, gpu_memory_utilization=UTIL, enforce_eager=True, max_model_len=2048, seed=0, dtype="bfloat16", disable_log_stats=True, swap_space=SWAP)
+    llm = LLM(model=Q, gpu_memory_utilization=UTIL, enforce_eager=True, max_model_len=2048, seed=0, dtype="bfloat16",
+              disable_log_stats=True, swap_space=SWAP, **({"enable_sleep_mode": True} if mode == "sleep" else {}))
     w = llm.llm_engine.model_executor.driver_worker
+    w = getattr(w, "worker", w)            # vLLM 0.8 wraps the worker
+
+    def bind(caches):
+        """vLLM 0.8 binds KV tensors to each attention layer. Unbound tensors would stay alive."""
+        ctx = getattr(getattr(w, "compilation_config", None), "static_forward_context", None)
+        if ctx is None:
+            return
+        if caches is None:
+            for layer in ctx.values():
+                if hasattr(layer, "kv_cache"):
+                    layer.kv_cache = [torch.tensor([]) for _ in layer.kv_cache]
+        else:
+            from vllm.utils import bind_kv_cache
+            bind_kv_cache(ctx, caches)
     c = None
     if mode in ("seg", "probe"):
         sys.path.insert(0, os.path.join(ROOT, "python"))
@@ -66,6 +98,12 @@ def worker(i, mode, conn):
             params = [SamplingParams(max_tokens=n, temperature=0, ignore_eos=True) for _, _, n in reqs]
             outs = llm.generate(prompts, params, use_tqdm=False)
             conn.send(("done", time.time(), sum(len(o.outputs[0].token_ids) for o in outs)))
+        elif msg[0] == "park" and mode == "sleep":     # vLLM's own path: weights to host memory, KV discarded
+            llm.sleep(level=1); torch.cuda.synchronize()
+            conn.send(("parked", torch.cuda.memory_allocated() >> 20, torch.cuda.memory_reserved() >> 20))
+        elif msg[0] == "resume" and mode == "sleep":
+            t0 = time.perf_counter(); llm.wake_up(); torch.cuda.synchronize()
+            conn.send(("resumed", time.perf_counter() - t0, 0.0, False))
         elif msg[0] == "park":
             c.park(f"m{i}")
             if KEEP_CPU:
@@ -74,6 +112,7 @@ def worker(i, mode, conn):
             else:
                 w.cache_engine = None
             w.gpu_cache = None
+            bind(None)
             gc.collect(); torch.cuda.synchronize()
             if CLEAR or (len(msg) > 1 and msg[1]):
                 torch._C._cuda_clearCublasWorkspaces()
@@ -118,6 +157,7 @@ def worker(i, mode, conn):
                 for ce in w.cache_engine:
                     ce.gpu_cache = ce._allocate_kv_cache(ce.num_gpu_blocks, "cuda")
                 w.gpu_cache = [ce.gpu_cache for ce in w.cache_engine]
+                bind(w.gpu_cache)
             else:
                 w._init_cache_engine()
             torch.cuda.synchronize()
@@ -155,15 +195,24 @@ def main():
             time.sleep(0.05)
         return p
 
-    def spawn(i):
-        a, b = ctx.Pipe()
-        p = ctx.Process(target=worker, args=(i, mode, b), daemon=True)
-        p.start()
-        if not a.poll(600):                 # a worker that died at import would block this forever
-            raise RuntimeError(f"model {i} did not start")
-        msg = a.recv()
-        procs[i], pipes[i] = p, a
-        return msg[1]
+    def spawn(i, tries=3):
+        # vLLM 0.8.5 inspects the model class in a subprocess, and that subprocess sometimes dies with
+        # SIGSEGV. The worker then exits before it is ready. Start it again.
+        for attempt in range(tries):
+            a, b = ctx.Pipe()
+            p = ctx.Process(target=worker, args=(i, mode, b), daemon=True)
+            p.start()
+            deadline = time.time() + 600
+            while time.time() < deadline and p.is_alive() and not a.poll(1):
+                pass
+            if a.poll(0):
+                msg = a.recv()
+                procs[i], pipes[i] = p, a
+                stats["start_retries"] = stats.get("start_retries", 0) + attempt
+                return msg[1]
+            p.kill(); p.join()
+            print(f"model {i} did not start, attempt {attempt + 1}", file=sys.stderr, flush=True)
+        raise RuntimeError(f"model {i} did not start")
 
     def toggle(i, part=None):
         t = time.perf_counter()
@@ -197,7 +246,14 @@ def main():
                                   device_freed_by_checkpoint_mib=before - after, checkpoint_s=round(t_ckpt, 3),
                                   restore_s=round(t_restore, 3), same_output=same)), flush=True)
         os._exit(0)
-    if mode == "seg":
+    if mode == "sleep":
+        for i in reversed(range(N)):
+            spawn(i)
+            if i >= ACTIVE:
+                call(i, "park"); state[i] = "parked"
+            else:
+                state[i] = "active"
+    elif mode == "seg":
         broker = start_broker()
         # Start one at a time: vLLM sizes its pool from free memory. Start the idle models first,
         # so their segments are unmapped and the budget can evict them for the active ones.
@@ -230,7 +286,7 @@ def main():
             v = min(idle, key=lambda k: last[k]); busy[v] = True
             cond.release()
             try:
-                if mode == "seg":
+                if mode in ("seg", "sleep"):
                     call(v, "park")
                 else:
                     if not held:
@@ -244,12 +300,12 @@ def main():
                         procs[v].kill(); procs[v].join()
             finally:
                 cond.acquire()
-            state[v] = "parked" if mode == "seg" else "off"; busy[v] = False; last[v] = time.time()
+            state[v] = "parked" if mode in ("seg", "sleep") else "off"; busy[v] = False; last[v] = time.time()
         busy[i] = True; prev = state[i]; state[i] = "waking"
         cond.release()
         t = time.perf_counter()
         try:
-            if mode == "seg":
+            if mode in ("seg", "sleep"):
                 th = hib_threads.pop(i, None)
                 tw = time.perf_counter()
                 if th:
@@ -335,7 +391,7 @@ def main():
                tokens_per_s=round(stats["tokens"] / wall, 1), p50_s=pct(.5), p90_s=pct(.9), p99_s=pct(.99), max_s=pct(1.0),
                wakes=stats["wakes"], wake_mean_s=round(sum(stats["wake_s"]) / max(1, len(stats["wake_s"])), 3), restores=stats["restores"],
                colds=stats["colds"], cold_mean_s=round(sum(stats["cold_s"]) / max(1, len(stats["cold_s"])), 1),
-               setup_used_mib=setup_used, used_mean_mib=round(sum(samples) / max(1, len(samples))), used_max_mib=max(samples or [0]), broker_killed=killed, dead_engines=stats.get("dead", 0),
+               setup_used_mib=setup_used, used_mean_mib=round(sum(samples) / max(1, len(samples))), used_max_mib=max(samples or [0]), broker_killed=killed, dead_engines=stats.get("dead", 0), start_retries=stats.get("start_retries", 0),
                hib_after=HIB_AFTER, swap_gib=SWAP, keep_cpu=KEEP_CPU, clear=CLEAR, budget_gib=BUDGET_GIB, reloads=reloads[0],
                parts={k: dict(n=len(v), mean=round(sum(v) / len(v), 3), p50=round(sorted(v)[len(v) // 2], 3), max=round(max(v), 3)) for k, v in parts.items() if v})
     print(json.dumps(out), flush=True)
