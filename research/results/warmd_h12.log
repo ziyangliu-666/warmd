@@ -1,7 +1,0 @@
-2026-11-02T16:11:26.667Z INFO  [warmd 57241] listening on /tmp/warmd-exp/seg.sock: gpu 0, 64 sessions x 16.0 MB, 0 standby, quota 0 MB, protocol v2
-2026-11-02T16:11:26.668Z INFO  [warmd 57241] spawned worker pid 57245 (epoch 1)
-2026-11-02T16:11:27.549Z INFO  [warmd 57241] worker 57245 ready in 878 ms (GPU mem used 433 MB)
-2026-11-02T16:11:27.549Z INFO  [warmd 57241] worker 57245 promoted to ACTIVE (epoch 1)
-2026-11-02T16:11:27.550Z INFO  [worker 57245] ACTIVE with 4 dispatch threads
-2026-11-02T16:12:07.151Z INFO  [warmd 57241] shutting down
-2026-11-02T16:12:07.151Z INFO  [worker 57245] stop

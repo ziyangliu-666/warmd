@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "warmd"
 version = "0.1.0"
-description = "Shared read-only GPU weights and a fork-server pool for short GPU tasks"
+description = "A fork-server pool for short GPU tasks on the warmd daemon"
 requires-python = ">=3.9"
 license = {text = "Apache-2.0"}
 

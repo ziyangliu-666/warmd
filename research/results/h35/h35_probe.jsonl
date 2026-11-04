@@ -1,4 +1,0 @@
-{"probe": 0, "clear": false, "torch_allocated_mib": 462, "torch_reserved_mib": 488, "device_freed_by_checkpoint_mib": 1005, "checkpoint_s": 0.816, "restore_s": 0.619, "same_output": true}
-{"probe": 1, "clear": true, "torch_allocated_mib": 454, "torch_reserved_mib": 468, "device_freed_by_checkpoint_mib": 988, "checkpoint_s": 0.8, "restore_s": 0.666, "same_output": true}
-{"probe": 2, "clear": false, "torch_allocated_mib": 462, "torch_reserved_mib": 488, "device_freed_by_checkpoint_mib": 1007, "checkpoint_s": 0.729, "restore_s": 0.512, "same_output": true}
-{"probe": 3, "clear": true, "torch_allocated_mib": 454, "torch_reserved_mib": 468, "device_freed_by_checkpoint_mib": 989, "checkpoint_s": 0.744, "restore_s": 0.59, "same_output": true}

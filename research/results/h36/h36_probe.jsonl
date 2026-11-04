@@ -1,4 +1,0 @@
-{"probe": 0, "alive_after_park": [[445, [151936, 1536], "torch.bfloat16", "model.embed_tokens.weight"], [52, [17920, 1536], "torch.bfloat16", "model.layers.9.mlp.gate_up_proj.weight"], [52, [17920, 1536], "torch.bfloat16", "model.layers.8.mlp.gate_up_proj.weight"]], "holders": []}
-{"probe": 0, "clear": false, "torch_allocated_mib": 16, "torch_reserved_mib": 42, "device_freed_by_checkpoint_mib": 559, "checkpoint_s": 0.557, "restore_s": 0.588, "same_output": true}
-{"probe": 1, "alive_after_park": [[445, [151936, 1536], "torch.bfloat16", "model.embed_tokens.weight"], [52, [17920, 1536], "torch.bfloat16", "model.layers.9.mlp.gate_up_proj.weight"], [52, [17920, 1536], "torch.bfloat16", "model.layers.8.mlp.gate_up_proj.weight"]], "holders": []}
-{"probe": 1, "clear": true, "torch_allocated_mib": 8, "torch_reserved_mib": 22, "device_freed_by_checkpoint_mib": 542, "checkpoint_s": 0.566, "restore_s": 0.574, "same_output": true}

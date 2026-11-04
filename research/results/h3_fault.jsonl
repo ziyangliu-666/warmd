@@ -1,3 +1,0 @@
-{"test": "fault", "culprit": "CUDA error: an illegal memory access was encountered\nCUDA kernel errors might be asynchron", "report_ms": 3219, "bystander": ["bystander_ok", true], "owner_ok": true}
-{"test": "wild", "impl": "native", "attacker": "faulted: CUDA error: an illegal memory access was encountered\nCUDA kernel error", "victim_value": 0.0, "victim": "alive"}
-{"test": "wild", "impl": "warmd", "attacker": "store_completed", "victim_value": 9.0, "victim": "alive"}

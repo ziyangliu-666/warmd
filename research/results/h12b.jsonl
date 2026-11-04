@@ -1,5 +1,0 @@
-{"test": "task_per_process", "mode": "warmd_seg", "gb": 7.5, "n": 16, "conc": 1, "tasks_s": 16.29, "p50_ms": 62.0, "p99_ms": 64.7, "wrong": 0, "ref": 27.136173248291016, "distinct": [27.136173248291016], "n_distinct": 1}
-{"test": "task_per_process", "mode": "warmd_seg", "gb": 7.5, "n": 16, "conc": 1, "tasks_s": 16.2, "p50_ms": 62.1, "p99_ms": 69.3, "wrong": 0, "ref": 27.136173248291016, "distinct": [27.136173248291016], "n_distinct": 1}
-{"test": "task_per_process", "mode": "warmd_seg", "gb": 7.5, "n": 64, "conc": 8, "tasks_s": 80.43, "p50_ms": 91.2, "p99_ms": 115.5, "wrong": 64, "ref": 27.136173248291016, "distinct": [NaN, NaN, NaN, NaN], "n_distinct": 64}
-{"test": "task_per_process", "mode": "warmd_seg", "gb": 7.5, "n": 64, "conc": 8, "tasks_s": 80.98, "p50_ms": 92.0, "p99_ms": 111.0, "wrong": 64, "ref": 27.136173248291016, "distinct": [NaN, NaN, NaN, NaN], "n_distinct": 63}
-{"test": "task_per_process", "mode": "warmd_seg", "gb": 7.5, "n": 64, "conc": 2, "tasks_s": 28.51, "p50_ms": 70.1, "p99_ms": 78.1, "wrong": 63, "ref": 27.136173248291016, "distinct": [NaN, NaN, NaN, NaN], "n_distinct": 64}

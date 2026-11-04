@@ -1,7 +1,0 @@
-2026-11-02T14:02:54.465Z INFO  [warmd 37503] listening on /tmp/warmd-exp/gpu0.sock: gpu 0, 64 sessions x 16.0 MB, 0 standby, quota 0 MB, protocol v2
-2026-11-02T14:02:54.466Z INFO  [warmd 37503] spawned worker pid 37513 (epoch 1)
-2026-11-02T14:02:55.332Z INFO  [warmd 37503] worker 37513 ready in 863 ms (GPU mem used 433 MB)
-2026-11-02T14:02:55.332Z INFO  [warmd 37503] worker 37513 promoted to ACTIVE (epoch 1)
-2026-11-02T14:02:55.332Z INFO  [worker 37513] ACTIVE with 4 dispatch threads
-2026-11-02T14:09:27.342Z INFO  [warmd 37503] shutting down
-2026-11-02T14:09:27.362Z INFO  [worker 37513] stop

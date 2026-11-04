@@ -1,3 +1,0 @@
-vLLM 0.8.5 sleep mode, run h36e (assert removed): 137 sleeps, mean 0.785 s; 127 wakes, mean 0.161 s (from vLLM log lines).
-Run h36d (unmodified vLLM) crashed after 124 sleeps and 114 wakes: AssertionError "Memory usage increased after sleeping",
-then "Trying to free a pointer not allocated here". Upstream: issue 63057, pull request 63089, both open on 2026-11-04.

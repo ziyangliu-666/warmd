@@ -1,9 +1,0 @@
-host fd /dev/null, version 1:   FAIL cuMemImportFromShareableHandle(&h, (void*)(uintptr_t)fd, CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR): 101 invalid device ordinal
-host fd /dev/null, version 2:   FAIL cuMemImportFromShareableHandle(&h, (void*)(uintptr_t)fd, CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR): 101 invalid device ordinal
-host fd /dev/nvidia0, version 1:   FAIL cuMemImportFromShareableHandle(&h, (void*)(uintptr_t)fd, CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR): 101 invalid device ordinal
-host fd /dev/nvidia0, version 2:   FAIL cuMemImportFromShareableHandle(&h, (void*)(uintptr_t)fd, CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR): 101 invalid device ordinal
-host fd /dev/nvidiactl, version 1:   FAIL cuMemImportFromShareableHandle(&h, (void*)(uintptr_t)fd, CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR): 101 invalid device ordinal
-host fd /dev/nvidiactl, version 2:   FAIL cuMemImportFromShareableHandle(&h, (void*)(uintptr_t)fd, CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR): 101 invalid device ordinal
-host fd /x/xc, version 1:   FAIL cuMemImportFromShareableHandle(&h, (void*)(uintptr_t)fd, CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR): 101 invalid device ordinal
-host fd /x/xc, version 2:   FAIL cuMemImportFromShareableHandle(&h, (void*)(uintptr_t)fd, CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR): 101 invalid device ordinal
-0

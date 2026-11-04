@@ -1,4 +1,0 @@
-{"test": "evict_mapped", "used_before": 8213, "used_after_broker_release": 8213, "client_output_still_correct": true}
-{"test": "ckpt_mapped", "rc": 0, "err": "", "ms": 3290, "used_after": 513, "state": "checkpointed"}
-{"test": "restore_mapped", "rc": 1, "ms": 20095, "used_after": 1051, "output_correct": false}
-{"test": "kill", "ms_until_memory_below_2gb": 24, "used": 513}

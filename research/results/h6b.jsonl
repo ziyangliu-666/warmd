@@ -1,5 +1,0 @@
-{"test": "native", "gb": 8, "native_sum": 27.136173248291016, "native_ms": 11.87}
-{"test": "equal", "gb": 8, "first_open_s": 0.997, "mapped_sum": 27.136173248291016, "mapped_ms": 11.74}
-{"test": "park", "gb": 8, "park_ms": 0.44, "resume_resident_ms": 1.46, "same_after_resident_resume": true, "evict_ms": 5.14, "resume_reload_ms": 1008.63, "first_forward_after_reload_ms": 13.32, "same_after_reload": true, "used_mapped_mib": 9190, "used_evicted_mib": 2032}
-{"test": "fault", "gb": 8, "writer": "faulted: CUDA error: an illegal memory access was encountered\nCUDA kernel errors might be", "report_ms": 919, "before": -0.016815185546875, "bystander_same_output": true, "bystander_alive": true, "weight_changed": false}
-{"test": "share", "gb": 8, "base_mib": 8648, "runs": [{"procs": 1, "used_mib": 9190, "same_output": true}, {"procs": 4, "used_mib": 10817, "same_output": true}, {"procs": 8, "used_mib": 12983, "same_output": true}, {"procs": 16, "used_mib": 17317, "same_output": true}]}

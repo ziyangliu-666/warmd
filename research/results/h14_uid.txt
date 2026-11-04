@@ -1,1 +1,0 @@
-{'uid': 65534, 'first_open_s': 4.627, 'mapped_sum': 27.136173248291016, 'mapped_ms': 12.08}

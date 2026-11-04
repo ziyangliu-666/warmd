@@ -1,10 +1,10 @@
 # warmd
 
-Elastic GPU processes for PyTorch: share model weights between processes without a copy, and park or hibernate a process without losing its state.
+A shared CUDA context for short-lived processes.
 
-**Segments** (`warmd.segments`) hold model weights in device memory that outlives any process. Each process maps them read-only and keeps its own CUDA context, so a fault stays in that process. A parked process resumes in about 1 ms. See [docs/segments.md](docs/segments.md).
+The warmd daemon holds one CUDA context per GPU. Programs that load warmd's `libcuda.so.1` send their driver calls to it, so they can `fork()` after CUDA is initialized. Use it for many short tasks in one trust domain. All its processes share one fault domain.
 
-**The warmd daemon** holds one CUDA context per GPU. Programs that load warmd's `libcuda.so.1` send their driver calls to it, so they can `fork()` after CUDA is initialized. Use it for many short tasks in one trust domain. All its processes share one fault domain.
+To share model weights between processes that keep their own contexts, use [gpu-segments](https://github.com/ziyangliu-666/gpu-segments). It does not need warmd. For many short kernels in one trust domain, also compare with NVIDIA MPS: the measurements are in [elastic-gpu-research](https://github.com/ziyangliu-666/elastic-gpu-research).
 
 ![Without warmd](docs/img/without-warmd.svg)
 
@@ -20,7 +20,7 @@ $ build/warmd &
 $ LD_LIBRARY_PATH=build/lib python3 -c 'import torch; print(torch.ones(2, device="cuda"))'
 ```
 
-`tests/run.sh` runs the tests. `tests/segment_tests.py` needs no GPU.
+`tests/run.sh` runs the tests.
 
 ## Performance
 
@@ -37,7 +37,7 @@ Each call to the daemon adds 10 to 15 µs, and large copies run at 3 to 5 GB/s. 
 
 ## Documentation
 
-[segments](docs/segments.md), [warmd(8)](docs/warmd.8.md), [deploying](docs/deploy.md), [Python package](docs/python.md),
+[warmd(8)](docs/warmd.8.md), [deploying](docs/deploy.md), [Python package](docs/python.md),
 [design](docs/design.md), [compatibility](docs/compat.md), [performance](docs/perf.md).
 
 ## License
